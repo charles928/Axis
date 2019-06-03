@@ -1,0 +1,71 @@
+﻿@{
+    ViewBag.Title = "Login";
+}
+
+@section scripts {
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $(document).keypress(function (e) {
+                if (e.which == 13) {
+                    curinput = $(document.activeElement).attr("id");
+                    if (curinput == "inputUserName")
+                        document.getElementById("inputPassword").focus();
+                    if (curinput == "inputPassword")
+                    {
+                        $("#myPleaseWait").modal('show');
+                        $.ajax({
+                            type: 'POST',
+                            data: {
+                                UserName: $("#inputUserName").val(),
+                                Password: $("#inputPassword").val()
+                            },
+                            async: false,
+                            datatype: JSON,
+                            url: "/Home/Login",
+                            success: function (result) {
+                                if (result == "Success")
+                                {
+                                    window.location.href = "../Dashboard/Index";
+                                }
+                                else
+                                {
+                                    if (result == "Unknown User" || result == "User Deleted") {
+                                        $("#myPleaseWait").modal('hide');
+                                        alert(result);
+                                        $("#inputPassword").val("");
+                                        $("#inputUserName").focus();
+                                        $("#inputUserName").select();
+                                    }
+                                    if (result == "Bad Password") {
+                                        $("#myPleaseWait").modal('hide');
+                                        alert(result);
+                                        $("#inputPassword").focus();
+                                        $("#inputPassword").select();
+                                    }
+                                }
+                            },
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                alert("Error: Login Error /" + thrownError);
+                            }
+                        });
+                    }
+                }
+            });
+           // $('#LoginTable').DataTable();
+            document.getElementById("inputUserName").focus();
+        });
+    </script>
+}
+
+
+<div class="ExceptionBox" style="display:table; position:absolute; left:0; right:0; margin:0 auto; width:250px; padding:10px; margin-top:20px; background-color: #f5f5f5;">
+    <div class="panel-heading" style="background-color:#aec72d;">
+        <h3 class="panel-title">&nbsp;Login</h3>
+    </div>
+    <div class="panel-body">
+        <label for="inputUserName" class="control-label">UserName</label><input type="text" class="form-control" style="font-size:16px; margin-bottom:10px;" id="inputUserName">
+        <label for="inputPassword" class="control-label">Password</label><input type="password" class="form-control" style="font-size:16px;" id="inputPassword">
+    </div>
+</div>
+
+

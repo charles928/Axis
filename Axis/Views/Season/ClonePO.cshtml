@@ -1,0 +1,487 @@
+﻿@model IEnumerable<spSTH_Clone_Result>
+
+@{
+    ViewBag.Title = @ViewData["PageName"];
+}
+@section scripts {
+    <script type="text/javascript">
+        var STHTable;
+        var vEvent_ID = 0;
+        var idx;
+
+        function fn_CreatePO()
+        {
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var NewEvent = $("#EventList").val();
+                if (parseInt(NewEvent) > 0)
+                    vEvent_ID = NewEvent;
+                 else
+                    fn_AddEvent();
+
+                if (vEvent_ID > 0)
+                {
+                    var Agent_ID = $("#AgentList").val();
+                    var CC_ID = $("#CCList").val();
+                    var Items = "";
+                    $('#STHTable TBODY TR').each(function () {
+                        var ID = this.id.replace("TR_", "");
+                        var Sec = $("#Sec_" + ID).val();
+                        var Row = $("#Row_" + ID).val();
+                        var Qty = $("#Qty_" + ID).val();
+                        var Min = $("#Min_" + ID).val();
+                        var SSF = $("#SSF_" + ID).text();
+                        var Don = $("#Don_" + ID).val().replace("$", "").replace(",", "") / Qty;
+                        var Cost = $("#Cost_" + ID).val().replace("$", "").replace(",", "") / Qty;
+                        Items += Sec + "|" + Row + "|" + Qty + "|" + Min + "|" + SSF + "|" + Don + "|" + Cost + "~";
+                    });
+                    var URL = "/Season/MakePO";
+                    $.ajax({
+                        async: false,
+                        type: 'POST',
+                        url: URL,
+                        data: {
+                            SourcePO: @ViewData["SourcePO"],
+                            Event: vEvent_ID,
+                            Agent: Agent_ID,
+                            Payment: CC_ID,
+                            Items: Items
+                        },
+                        success: function (result) {
+                            if (parseInt(result) > 0)
+                            {
+                                var w = 860;
+                                var h = 900;
+                                var URL = "../Purchase/GetPO?PO_ID=" + result;
+                                popupWindow(URL, "PO", w, h);
+                            }
+                            else
+                                alert(result);
+
+                            window.close();
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            alert("Error: Cloning PO /" + thrownError);
+                            $('#myPleaseWait').modal('hide');
+                        }
+                    });
+                }
+            }, 250);
+        }
+        function fn_AddEvent()
+        {
+            var Season = $("#YearEntry").val();
+            var Performer = $("#HeadlinerList option:selected").text();
+            var Child = $("#ChildList option:selected").text();
+            $("#NewEventName").val(Season + ' ' + Performer + ' ' + Child + ' Season Tickets');
+            $("#NewEventDate").val('@ViewBag.BeginMonth/@ViewBag.BeginDay/' + Season);
+            $('#myPleaseWait').modal('hide');
+            $("#AddDiv").modal('show');
+        }
+        function fn_CreateNewEvent()
+        {
+            var Name = $("#NewEventName").val();
+            var Date = $("#NewEventDate").val();
+            var Headliner = $("#HeadlinerList").val();
+            var Parent = $("#ParentList").val();
+            var Child = $("#ChildList").val();
+            var Grandchild = $("#GrandchildList").val();
+
+            var URL = "/Season/AddEvent";
+            $.ajax({
+                type: 'POST',
+                url: URL,
+                data: {
+                    Name: Name,
+                    Date: Date,
+                    Headliner: Headliner,
+                    Parent: Parent,
+                    Child: Child,
+                    Grandchild: Grandchild,
+                    Venue: @ViewBag.Venue_ID
+                },
+                success: function (result) {
+                    if (result == "0")
+                    {
+                        alert("Error creating event!");
+                        $('#myPleaseWait').modal('hide');
+                    }
+                    else {
+                        vEvent_ID = result;
+                        fn_CreatePO();
+                    }
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Adding Event /" + thrownError);
+                    $('#myPleaseWait').modal('hide');
+                }
+            });
+        }
+        function fn_AddRow()
+        {
+            var NewID = 0;
+            var RecCount = 1;
+            $('#STHTable TBODY TR').each(function () {
+                var ID = this.id.replace("TR_", "");
+                RecCount += 1;
+                if (parseInt(ID) > parseInt(NewID))
+                    NewID = ID;
+            });
+            NewID = parseInt(NewID) + 1;
+            var NewRec = "<tr class=\"TRClass\" id=\"TR_" + NewID + "\">" +
+                        "<td style=\"padding:0;\"><input id=\"Sec_" + NewID + "\" style=\"padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;\" value=\" \" onclick=\"this.select();\" /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Row_" + NewID + "\" style=\"padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;\" value=\" \" onclick=\"this.select();\" /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Qty_" + NewID + "\" style=\"text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;\" value=\"0\" onclick=\"this.select();\" onchange=\"fn_ChangeQty('Qty', " + NewID + ");\" /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Min_" + NewID + "\" style=\"text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;\" value=\"0\" onclick=\"this.select();\" onchange=\"fn_ChangeQty('Max', " + NewID + ");\" /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Max_" + NewID + "\" style=\"text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;\" value=\"0\" readonly=\"readonly\" /></td>" +
+                        "<td style=\"padding:0; padding-right:5px; text-align:center;\"><a href=\"#\" id=\"SSF_" + NewID + "\" onclick=\"fn_ToggleSSF(" + NewID + ");\">SEQ</a></td>" +
+                        "<td style=\"padding:0; padding-right:5px; text-align:center;\"><a href=\"#\">0</a></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Don_" + NewID + "\" style=\"text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;\" value=\"$0.00\" onclick=\"this.select();\" onchange=\"fn_ChangeAmt('Don', " + NewID + ");\" /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Cost_" + NewID + "\" style=\"text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;\" value=\"$0.00\" onclick=\"this.select();\" onchange=\"fn_ChangeAmt('Cost', " + NewID + ");\" /></td>" +
+                        "<td id=\"Total_" + NewID + "\" style=\"padding-right:5px; text-align:right\">$0.00</td>" +
+                        "<td style=\"padding:0; max-width:23px; text-align:center;\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_DelRow(" + NewID + ");\">clear</i></td>" +
+                        "<td id=\"SSec_" + NewID + "\"></td>" +
+                        "<td id=\"SRow_" + NewID + "\"></td>" +
+                        "<td id=\"SQty_" + NewID + "\">0</td>" +
+                        "<td id=\"SMin_" + NewID + "\">0</td>" +
+                        "<td id=\"SMax_" + NewID + "\">0</td>" +
+                        "<td id=\"SDon_" + NewID + "\">0</td>" +
+                        "<td id=\"SCost_" + NewID + "\">0</td></tr>";
+
+            STHTable.destroy();
+            $("#STHTable tbody").append(NewRec);
+            STHTable = $('#STHTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "autoWidth": false,
+                "aoColumnDefs": [
+                    { targets: [10], sortable: false },
+                    { targets: [11, 12, 13, 14, 15, 16, 17], visible: false },
+                    { iDataSort: 11, targets: [0] },
+                    { iDataSort: 12, targets: [1] },
+                    { iDataSort: 13, targets: [2] },
+                    { iDataSort: 14, targets: [3] },
+                    { iDataSort: 15, targets: [4] },
+                    { iDataSort: 16, targets: [7] },
+                    { iDataSort: 17, targets: [8] },
+                    { "sWidth": "20px", "aTargets": [6] }
+                ],
+                "order": [[0, "asc"]]
+            });
+            STHTable.draw();
+            $("#FRecCount").text(RecCount + " Records");
+            $("#Sec_" + NewID).focus();
+        }
+        function fn_DelRow(ID)
+        {
+            var rows = STHTable
+                .rows( '#TR_' + ID )
+                .remove()
+                .draw();
+            fn_RecalcTotals();
+        }
+        function fn_ToggleSSF(ID) {
+            var nQty = $("#Qty_" + ID).val();
+            var nMin = $("#Min_" + ID).val();
+            var nSSF = $("#SSF_" + ID).text();
+
+            if (nSSF == "SEQ")
+                $("#SSF_" + ID).text("NOT");
+            else
+                $("#SSF_" + ID).text("SEQ");
+
+            if (nSSF == "SEQ") //this is backwards becuase the nSSF is before the change
+                $("#Max_" + ID).val(parseInt(nMin) + (parseInt(nQty) * 2) - 2);
+            else
+                $("#Max_" + ID).val(parseInt(nMin) + parseInt(nQty) - 1);
+
+        }
+        function fn_RecalcTotals() {
+            var Records = 0;
+            var Seats = 0;
+            var Total = 0;
+            $('#STHTable TBODY TR').each(function () {
+                var ID = this.id.replace("TR_", "");
+                if (ID > 0) {
+                    var CurSeats = parseInt($("#Qty_" + ID).val());
+                    var CurDon = parseFloat($("#Don_" + ID).val().replace("$", "").replace(",", ""));
+                    var CurCost = parseFloat($("#Cost_" + ID).val().replace("$", "").replace(",", ""));
+                    var SubTotal = (parseFloat(CurDon) + parseFloat(CurCost));
+
+                    Records += 1;
+                    Seats += parseInt(CurSeats);
+                    Total += parseFloat(SubTotal);
+                    $("#Total_" + ID).text(formatCurrency(SubTotal));
+                }
+            });
+            $("#FRecCount").text(Records + " Records");
+            $("#FSeats").text(Seats);
+            $("#FTotal").text(formatCurrency(Total));
+        }
+        function fn_Change(Source, ID)
+        {
+            var nVal = $("#" + Source + "_" + ID).val();
+            $("#S" + Source + "_" + ID).text(nVal);
+        }
+        function fn_ChangeAmt(Source, ID)
+        {
+            var NewAmt = parseFloat($("#" + Source + "_" + ID).val());
+            var NewAmt2 = formatCurrency(NewAmt);
+            $("#S" + Source + "_" + ID).text(NewAmt);
+            $("#" + Source + "_" + ID).val(NewAmt2);
+ 
+            fn_RecalcTotals();
+        }
+        function fn_ChangeQty(Source, ID)
+        {
+            var nQty = $("#Qty_" + ID).val();
+            var nMin = $("#Min_" + ID).val();
+            var nMax = $("#Max_" + ID).val();
+            var nSSF = $("#SSF_" + ID).text();
+            if (nSSF == "SEQ")
+                $("#Max_" + ID).val(parseInt(nMin) + parseInt(nQty) - 1);
+            else
+                $("#Max_" + ID).val(parseInt(nMin) + (parseInt(nQty) * 2) - 2);
+            $("#SQty_" + ID).text(nQty);
+            $("#SMin_" + ID).text(nMin);
+            $("#SMax_" + ID).text(nMax);
+            fn_RecalcTotals();
+        }
+        function fn_UpdateValues(Type, NewValue) {
+            $('#myPleaseWait').modal('show');
+            $.ajax({
+                url: "/Season/UpdateValues?Type=" + Type + "&NewValue=" + NewValue,
+                async: false,
+                type: "POST",
+                success: function (response) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Error updating ' + Type + ': ' + thrownError);
+                }
+            });
+        }
+        function fn_GetEventList() {
+            var Season = $("#YearEntry").val();
+            var Performer_ID = $("#HeadlinerList").val();
+            var Parent_ID = $("#ParentList").val();
+            var Child_ID = $("#ChildList").val();
+            var Grandchild_ID = $("#GrandchildList").val();
+            var URL = "/Season/STHEventList?Season=" + Season + "&Performer_ID=" + Performer_ID + "&Parent_ID=" + Parent_ID + "&Child_ID=" + Child_ID + "&Grandchild_ID=" + Grandchild_ID;
+            $.ajax({
+                type: 'GET',
+                url: URL,
+                success: function (result) {
+                    $('#EventList').empty();
+                    $.each(result, function (key, value) {
+                        $("#EventList").append("<option value=" + value.Event_ID + ">" + value.Desc + "</option");
+                    });
+                    $('#EventList option:last-child').attr('selected', 'selected');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Getting Event List /" + thrownError);
+                }
+            });
+        }
+
+        $(document).ready(function () {
+            $(".NavBar").css("background-color", "");
+            $("#SE").css("background-color", "#353535");
+            $("#SearchWrapper8").show();
+            $("#LoginWrapper").show();
+
+            $("#AgentList").val(@ViewBag.Agent_ID);
+            $("#HeadlinerList").val(@ViewBag.Headliner_ID);
+            $("#ParentList").val(@ViewBag.Parent_ID);
+            $("#ChildList").val(@ViewBag.Child_ID);
+            $("#GrandchildList").val(@ViewBag.Grandchild_ID);
+            $("#CCList").val(@ViewBag.CC_ID);
+            
+            $("#STHTable tbody tr").click(function() {
+                idx = STHTable.row(this).index();
+            });
+      
+            $(document).keypress(function (e) {
+                if (e.which == 13) {
+                    var CurTableIndexs = STHTable.rows().indexes();
+                    var CurIndexArrayKey = CurTableIndexs.indexOf( idx );
+                    var NextItemIndex = CurTableIndexs[ CurIndexArrayKey + 1];
+                    var Inputs = $(document.activeElement).attr("id").split("_");
+                    var NextID = '#' + Inputs[0] + STHTable.row(NextItemIndex).id().replace('TR', '');
+                    $(NextID).focus();
+                    $(NextID).select();
+                    $(NextID).trigger("click");
+                }
+            });
+
+            $("#STH_Div").show();
+            STHTable = $('#STHTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "autoWidth": false,
+                "aoColumnDefs": [
+                    { targets: [10], sortable: false },
+                    { targets: [11, 12, 13, 14, 15, 16, 17], visible: false },
+                    { iDataSort: 11, targets: [0] },
+                    { iDataSort: 12, targets: [1] },
+                    { iDataSort: 13, targets: [2] },
+                    { iDataSort: 14, targets: [3] },
+                    { iDataSort: 15, targets: [4] },
+                    { iDataSort: 16, targets: [7] },
+                    { iDataSort: 17, targets: [8] },
+                    { "sWidth": "20px", "aTargets": [6] }
+                ],
+                "order": [[0, "asc"]]
+            });
+            STHTable.draw();
+
+            window.onresize = function () {
+                STHTable.columns.adjust().draw();
+            };
+            $('#EventList option:last-child').attr('selected', 'selected');
+        });
+    </script>
+}
+<div>
+    <label style="font-size:28pt; margin-top:-74px; margin-left:181px; color:#aec72d; position:absolute;">@ViewData["PageName"]</label>
+</div>
+
+<div id="MainDiv" style="text-align:center; background-color:transparent;">
+    <div id="STH_Div" style="padding:20px; padding-top:0px; display:inline-block; min-width:200px; vertical-align:middle; border-radius:4px; background-color:rgba(214, 228, 249,.9); box-shadow: rgba(53, 53, 53, 0.5) 0px 2px 8px 0px;">
+
+        <div style="float:left; padding:10px;">
+            <div style="display:inline-block; float:left;">
+                <label for="YearEntry" style="color:#000000; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Season</label>
+                <input id="YearEntry" style=" font-size:12pt; text-align:center; max-width:50px; border-radius:4px;" onclick="this.select();" onchange="fn_GetEventList();" value=@ViewBag.Season />
+            </div>
+            <div style="display:inline-block; float:left; margin-left:10px;">
+                <label for="HeadlinerList" style="color:#000000; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Headliner</label>
+                @Html.DropDownList("HeadlinerList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;", @onchange = "fn_UpdateValues('Headliner', this.value);" })
+            </div>
+            <div style="display:inline-block; float:left; margin-left:10px;">
+                <label for="ParentList" style="color:#000000; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Parent</label>
+                @Html.DropDownList("ParentList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;" })
+            </div>
+            <div style="display:inline-block; float:left; margin-left:10px;">
+                <label for="ChildList" style="color:#000000; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Child</label>
+                @Html.DropDownList("ChildList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;" })
+            </div>
+            <div style="display:inline-block; float:left; margin-left:10px;">
+                <label for="GrandchildList" style="color:#000000; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Grandchild</label>
+                @Html.DropDownList("GrandchildList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;" })
+            </div>
+            <div style="display:inline-block; float:left; margin-left:10px;">
+                <label for="EventList" style="color:#000000; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Event(s)</label>
+                @Html.DropDownList("EventList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;" })
+            </div>
+        </div>
+
+        <div style="clear:both; float:left; padding:10px;">
+            <div style="display:inline-block; float:left;">
+                <label for="AgentList" style="color:#000000; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Agent</label>
+                @Html.DropDownList("AgentList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;" })
+            </div>
+            <div style="display:inline-block; float:left; margin-left:10px;">
+                <label for="CCList" style="color:#000000; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Payment</label>
+                @Html.DropDownList("CCList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;" })
+            </div>
+        </div>
+        <table id="STHTable" class="table-bordered table-condensed" align="center" style="width:auto; border-radius:4px; box-shadow:10px 10px 5px 0px rgba(0,0,0,0.75); background-color:white;" border="0">
+            <thead>
+                <tr style="height:30px;">
+                    <th style="text-align:center;">Section</th>
+                    <th style="text-align:center;">Row</th>
+                    <th style="text-align:center;">Seats</th>
+                    <th style="text-align:center;">Min</th>
+                    <th style="text-align:center;">Max</th>
+                    <th style="text-align:center;">SSF</th>
+                    <th style="text-align:center;">Events</th>
+                    <th style="text-align:center;">Don</th>
+                    <th style="text-align:center;">Cost</th>
+                    <th style="text-align:center;">Total</th>
+                    <th></th>
+                    <th>SortSection</th>
+                    <th>SortRow</th>
+                    <th>SortSeats</th>
+                    <th>SortMin</th>
+                    <th>SortMax</th>
+                    <th>SortDonation</th>
+                    <th>SortCost</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr class="TRClass" id="TR_@item.ID">
+                        <td style="padding:0;"><input id="Sec_@item.ID" style="padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.section" onclick="this.select();" onchange="fn_Change('Sec', @item.ID);" /></td>
+                        <td style="padding:0;"><input id="Row_@item.ID" style="padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.row" onclick="this.select();" onchange="fn_Change('Row', @item.ID);" /></td>
+                        <td style="padding:0;"><input id="Qty_@item.ID" style="text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.Qty" onclick="this.select();" onchange="fn_ChangeQty('Qty', @item.ID);" /></td>
+                        <td style="padding:0;"><input id="Min_@item.ID" style="text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.Min" onclick="this.select();" onchange="fn_ChangeQty('Max', @item.ID);" /></td>
+                        <td style="padding:0;"><input id="Max_@item.ID" style="text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.Max" readonly="readonly" /></td>
+                        <td style="padding:0; padding-right:5px; text-align:center;"><a href="#" id="SSF_@item.ID" onclick="fn_ToggleSSF(@item.ID);">@item.SSF</a></td>
+                        <td style="padding:0; padding-right:5px; text-align:center;"><a href="#" title="@item.EventTitle">@item.Events</a></td>
+                        <td style="padding:0;"><input id="Don_@item.ID" style="text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@String.Format("{0:c}", item.Donation)" onclick="this.select();" onchange="fn_ChangeAmt('Don', @item.ID);" /></td>
+                        <td style="padding:0;"><input id="Cost_@item.ID" style="text-align:right; padding-right:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@String.Format("{0:c}", item.Cost)" onclick="this.select();" onchange="fn_ChangeAmt('Cost', @item.ID);" /></td>
+                        <td id="Total_@item.ID" style="padding-right:5px; text-align:right">@String.Format("{0:c}", item.Cost)</td>
+                        <td style="padding:0; max-width:23px; text-align:center;">
+                            <i class="material-icons" style="color:#adc72e;" onclick="fn_DelRow(@item.ID);">clear</i>
+                        </td>
+                        <td id="SSec_@item.ID">@item.section</td>
+                        <td id="SRow_@item.ID">@item.row</td>
+                        <td id="SQty_@item.ID">@item.Qty</td>
+                        <td id="SMin_@item.ID">@item.Min</td>
+                        <td id="SMax_@item.ID">@item.Max</td>
+                        <td id="SDon_@item.ID">@item.Donation</td>
+                        <td id="SCost_@item.ID">@item.Cost</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="2" id="FRecCount">@ViewBag.RecordCount</th>
+                    <th style="text-align:right; padding-right:5px;" id="FSeats">@ViewBag.ItemCount</th>
+                    <th colspan="7" style="text-align:right; padding-right:5px;" id="FTotal">@ViewBag.ItemTotal</th>
+                    <th style="padding:0; max-width:23px; text-align:center;">
+                        <i class="material-icons" style="color:#adc72e;" onclick="fn_AddRow();">add</i>
+                    </th>
+                    <th colspan="7" style="text-align:right;"></th>
+                </tr>
+            </tfoot>
+        </table>
+        <div style="width:100%; margin-top:15px; float:left;">
+            <button type="button" class="btn btn-default" style="background-color:#aec72d; color:#ffffff; border-radius:4px; box-shadow:10px 10px 5px 0px rgba(0,0,0,0.75);" onclick="fn_CreatePO();">Create PO</button>
+        </div>
+    </div>
+</div>
+<!--Begin Modal-->
+<div class="modal loadingModal" id="AddDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#ecf2f9;" ">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="margin-left:10px; width:80%; float:left;">
+                    <label style="font-size:24pt; margin-top:15px; font-weight:500; color:#ffffff; max-width:80%; float:left;">Add New Event</label>
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding:5px;">
+                <div style="width:100%;">
+                    <label for="NewEventName" style="font-weight:bold; font-size:12pt;">Name:&nbsp;</label><input id="NewEventName" style="border-radius:4px; padding-left:5px; width:420px; max-width:420px; font-size:12pt;" />
+                </div>
+                <div style="width:100%; margin-top:10px;">
+                    <label for="NewEventDate" style="font-weight:bold; font-size:12pt;">&nbsp;&nbsp;Date:&nbsp;</label><input id="NewEventDate" style="border-radius:4px; padding-left:5px; font-size:12pt; width:100px;" />
+                </div>
+                <div style="text-align:center;">
+                    <button type="button" class="btn btn-default" style="background-color:#aec72d; color:#ffffff;" onclick="fn_CreateNewEvent();">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

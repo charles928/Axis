@@ -1,0 +1,1606 @@
+﻿@model IEnumerable<spGet_MyEvents_Result>
+@{
+    ViewBag.Title = "My Dashboard";
+}
+@section scripts {
+
+    <script type="text/javascript">
+        var vLogin_ID = @Session["Login_ID"];
+        var vSearch = "";
+        var vSD;
+        var vED;
+        var vUpdate = false;
+        var SalesTable;
+        var SalesListTable;
+        var AssignedTable
+
+        function fn_SelectPO(PO) {
+            var w = 860;
+            var h = 900;
+            var URL = "../Purchase/GetPO?PO_ID=" + PO;
+            popupWindow(URL, "PO", w, h);
+        }
+        function doDelayedSearch(e) {
+            $("#ClearSearch").show();
+            if (e.key == 'Enter')
+                doSearch(); //this is your existing function
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(function () {
+                doSearch(); //this is your existing function
+            }, 2000);
+        }
+        function fn_ClearSearch() {
+            $("#ClearSearch").hide();
+            var mpw = $('#myPleaseWait').is(':hidden');
+            var sr = $('#SearchResult').is(':visible');
+            if (mpw && sr) {
+                setTimeout(function () {
+                    $("#SearchBox").val("");
+                    $("#SearchResult").hide();
+                }, 250)
+            }
+            $("#SearchBox").focus();
+        }
+        function fn_Continue() {
+            vSD = $("#StartDateAdv").val();
+            vED = $("#EndDateAdv").val();
+            vUpdate = false;
+            var $datepicker = $('#StartDateAdv2');
+            $datepicker.datepicker('setDate', vSD);
+            var $datepicker = $('#EndDateAdv2');
+            $datepicker.datepicker('setDate', vED);
+            vUpdate = true;
+            var vCatID = $("#CatList").val();
+            var vHeadlinerID = $("#HeadlinerList").val();
+            var vOptionID = $("#OptionList").val();
+            $("#CatList2").val(vCatID);
+            $("#HeadlinerList2").val(vHeadlinerID);
+            $("#OptionList2").val(vOptionID);
+            fn_BuildAdvancedSearch()
+        }
+        function fn_BuildAdvancedSearch() {
+            if (vUpdate)
+            {
+                $('#myPleaseWait').modal('show');
+                vSD = $("#StartDateAdv2").val();
+                vED = $("#EndDateAdv2").val();
+                var vCatID = $("#CatList2").val();
+                var vHeadlinerID = $("#HeadlinerList2").val();
+                var vOptionID = $("#OptionList2").val();
+                var URL = "../Dashboard/AdvancedSearch";
+                $.ajax({
+                    type: 'POST',
+                    data: {
+                        Start: vSD,
+                        End: vED,
+                        CatID: vCatID,
+                        HeadlinerID: vHeadlinerID,
+                        OptionID: vOptionID
+                    },
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        var AdvancedSearchTable2 = $("#AdvancedSearchTable2").DataTable().destroy();
+                        $("#AdvancedSearchTable2 tbody").empty();
+                        var vEventCount = 0;
+                        var vAvailableQty = 0;
+                        var vAvailableCost = 0;
+                        var vAvailablePrice = 0;
+                        var vSoldQty = 0;
+                        var vSoldCost = 0;
+                        var vProfit = 0;
+                        $.each(result, function (key, value) {
+                            vEventCount += 1;
+                            vAvailableQty += value.AvailableQty;
+                            vAvailableCost += value.AvailableCost;
+                            vAvailablePrice += value.AvailablePrice;
+                            vSoldQty += value.SoldQty;
+                            vSoldCost += value.SoldCost;
+                            vProfit += (value.Profit);
+                            var NewRec = "<tr id='Advanced_"+value.Event_ID+"' onclick=\"fn_SelectEvent('Advanced_"+value.Event_ID+"', " + value.Event_ID + ",0,1);\"><td style='text-align:center;'>" + value.DUE + "</td><td>" + value.Event_Date + "</td><td><a href='#' title='" + value.EventHover + "' >" + value.Event_Name + "</a></td><td>" + value.LastSold + "</td><td>" + value.LastPriced + "</td><td style='text-align:right; background-color:rgba(229,229,229,0.24);'>" + value.AvailableQty + "</td><td style='text-align:right; background-color:rgba(229,229,229,0.24);'>" + formatCurrency(value.AvailableCost) + "</td><td style='text-align:right; background-color:rgba(229,229,229,0.24);'>" + formatCurrency(value.AvailablePrice) + "</td><td style='text-align:right;'>" + value.SoldQty + "</td><td style='text-align:right;'>" + formatCurrency(value.SoldCost) + "</td><td style='text-align:right;'>" + formatCurrency(value.Profit) + "</td></tr>";
+                            $("#AdvancedSearchTable2 > tbody").append(NewRec);
+                        })
+                        $('#myPleaseWait').modal('hide');
+                        if ($("#AdvancedSearch2Div").is(':hidden'))
+                            $("#AdvancedSearch2Div").modal('show');
+                        $("#AdvancedSearchTable2").show();
+                        var AdvancedSearchTable2 = $('#AdvancedSearchTable2').DataTable({
+                            "destroy": true,
+                            "scrollY": '300px',
+                            "scrollCollapse": true,
+                            "paging": false,
+                            "searching": true,
+                            "autoWidth": true,
+                            "info": false,
+                            "footerCallback": function (tfoot, data, start, end, display) {
+                                $(tfoot).find('th').eq(0).html(vEventCount + " Events");
+                                $(tfoot).find('th').eq(1).html(vAvailableQty);
+                                $(tfoot).find('th').eq(2).html(formatCurrency(vAvailableCost));
+                                $(tfoot).find('th').eq(3).html(formatCurrency(vAvailablePrice));
+                                $(tfoot).find('th').eq(4).html(vSoldQty);
+                                $(tfoot).find('th').eq(5).html(formatCurrency(vSoldCost));
+                                $(tfoot).find('th').eq(6).html(formatCurrency(vProfit));
+                            }
+                        });
+                        AdvancedSearchTable2
+                             .rows()
+                             .nodes()
+                             .to$()
+                             .addClass('TableTr');
+                        setTimeout(function () {
+                            AdvancedSearchTable2.draw();
+                        }, 500);
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Getting Advanced Search List /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_UpdateHeadlinerList() {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Dashboard/BuildHeadlinerList";
+            if ($("#AdvancedSearch2Div").is(':visible')) {
+                vSD = $("#StartDateAdv2").val();
+                vED = $("#EndDateAdv2").val();
+                var vCatID = $("#CatList2").val();
+            } else {
+                vSD = $("#StartDateAdv").val();
+                vED = $("#EndDateAdv").val();
+                var vCatID = $("#CatList").val();
+            }
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Start: vSD,
+                    End: vED,
+                    CatID: vCatID
+                }, cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#HeadlinerList").empty();
+                    $("#HeadlinerList2").empty();
+                    $.each(result, function (key, value) {
+                        $("#HeadlinerList").append('<option value=' + value.Headliner_ID + '>' + value.Event_Headliner + '</option>');
+                        $("#HeadlinerList2").append('<option value=' + value.Headliner_ID + '>' + value.Event_Headliner + '</option>');
+                    });
+                    $("#HeadlinerList").val(0);
+                    $("#HeadlinerList2").val(0);
+                    if ($("#AdvancedSearch2Div").is(':visible')) {
+                        fn_BuildAdvancedSearch();
+                    }
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Getting Headliner List /" + thrownError);
+                }
+            });
+        }
+        function doSearch() {
+            var Search = $("#SearchBox").val();
+            if (Search != vSearch)
+            {
+                $('#myPleaseWait').modal('show');
+                var Search = $("#SearchBox").val();
+                vSearch = Search;
+                setTimeout(function () {
+                    if (Search.length == 0) {
+                        $("#SearchResult").hide();
+                        $('#myPleaseWait').modal('hide');
+                    } else {
+                        if ("@ViewBag.Title" == "POList")
+                        {
+                            var URL = "../PO/Search?Input=" + Search;
+                            $.ajax({
+                                type: "GET",
+                                cache: false,
+                                aysnc: true,
+                                url: URL,
+                                success: function (result) {
+                                    var foot = result.length + " events found.";
+                                    POTable = $("#POTable").DataTable().destroy();
+                                    $("#POTable tbody").empty();
+                                    var QSold = 0;
+                                    var QSoldCost = 0;
+                                    var QSoldPrice = 0;
+                                    var QUnsold = 0;
+                                    var QUnsoldCost = 0;
+                                    var QUnsoldPrice = 0;
+                                    var QShared = 0;
+                                    var QSharedPrice = 0;
+                                    $.each(result, function (key, value) {
+                                        QSold += parseInt(value.Sold);
+                                        QSoldCost += parseFloat(value.SoldCost);
+                                        QSoldPrice += parseFloat(value.SoldPrice);
+                                        QUnsold += parseInt(value.Unsold);
+                                        QUnsoldCost += parseFloat(value.UnsoldCost);
+                                        QUnsoldPrice = parseFloat(QUnsoldPrice) + parseFloat(value.UnsoldPrice);
+                                        QShared += parseInt(value.Shared);
+                                        QSharedPrice += parseFloat(value.SharedPrice);
+                                        var NewRec = "<tr id=\"TodaysPO_"+value.PO_ID+"\"><td " + value.PO_ID + "\"><a href=\"#\" class=\"TableLink\" title=\"Click to open PO Page\" onclick=\"fn_SelectEvent('TodaysPO_"+value.PO_ID+"',"+value.Event_ID+","+value.PO_ID+",1);\">" + value.PO_ID + "</a></td>";
+                                        NewRec += "<td><div class=\"TableText1\"><a href=\"#\" title=\"User Name\">"+value.User_Name+"</a></div><div class=\"TableText2\"><a href=\"#\" title=\"PO Date\">"+value.PO_Date+"</a></div></td>";
+                                        NewRec += "<td><div class=\"TableText1\"><a href=\"#\" title=\"Broker Name\">"+value.Broker_Name+"</a></div><div class=\"TableText2\"><a href=\"#\" title=\"Vendor Last Name\">"+value.Last_Name+"</a></div></td>";
+                                        NewRec += "<td><a href=\"#\" class=\"TableLink\" title=\"Click to open Event Page\" onclick=\"fn_SelectEvent('TodaysPO_"+value.PO_ID+"',"+value.Event_ID+",0,1);\">"+value.Event_Name+"</a></td>";
+                                        NewRec += "<td><div class=\"TableText1\"><a href=\"#\" title=\"Event Date\">"+value.Event_Date+"</a></div><div class=\"TableText2\"><a href=\"#\" title=\"Venue Info\">"+value.Venue+"</a></div></td>";
+                                        NewRec+="<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Sold Qty\">"+value.Sold+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Unsold Qty\">"+value.Unsold+"</a></div></td>";
+                                        NewRec+="<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Shared Qty\">"+value.Shared+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Shared Price\">"+formatCurrency(value.SharedPrice);+"</a></div></td>";
+                                        NewRec+="<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Sold Cost\">"+formatCurrency(value.SoldCost)+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Unsold Cost\">"+formatCurrency(value.UnsoldCost)+"</a></div></td>";
+                                        NewRec+="<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"% Sold\">"+value.PercentSold+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Available Price\">"+formatCurrency(value.UnsoldPrice)+"</a></div></td>";
+                                        NewRec+="<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Profit\">"+formatCurrency(value.Profit)+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Projected Profit\">"+formatCurrency(value.ProjProfit)+"</a></div></td>";
+                                        NewRec+="<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Avg Price\">"+formatCurrency(value.AvgPrice)+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Avg Cost\">"+formatCurrency(value.AvgCost)+"</a></div></td>";
+                                        NewRec+="<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Total Qty\">"+value.TotalQty+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Total Profit\">"+formatCurrency(value.TotalProfit)+"</a></div></td>";
+                                        NewRec+="<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"SH Qty\">"+value.SHQty+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"ROC\">"+value.ROC+"</a></div></td>";
+                                        NewRec += "<td>" + value.Event_Date2 + "</td></tr>";
+                                        $("#POTable > tbody").append(NewRec);
+                                    })
+                                    var QPercentSold = Math.round(QSold / (parseInt(QSold) + parseInt(QUnsold)) * 100);
+                                    var QProfit = parseFloat(QSoldPrice) - parseFloat(QSoldCost);
+                                    var QAvgPrice = (parseFloat(QSoldPrice) + parseFloat(QUnsoldPrice)) / (parseFloat(QSold) + parseFloat(QUnsold));
+                                    var QTotalQty = parseInt(QSold) + parseInt(QUnsold);
+                                    var QProjectedProfit = parseFloat(QUnsoldPrice) - parseFloat(QUnsoldCost);
+                                    var QAvgCost = (parseFloat(QSoldCost) + parseFloat(QUnsoldCost)) / (parseFloat(QSold) + parseFloat(QUnsold));
+                                    var QTotalProfit = parseFloat(QProfit) + parseFloat(QProjectedProfit);
+
+                                    var QFoot1 = "<div><a href=\"#\" title=\"Total Sold Qty\" style=\"color:white;\">"+QSold+"</a></div><div><a href=\"#\" title=\"Total Unsold Qty\" style=\"color:white;\">"+QUnsold+"</a></div>";
+                                    var QFoot2 = "<div><a href=\"#\" title=\"Total Shared Qty\" style=\"color:white;\">"+QShared+"</a></div><div><a href=\"#\" title=\"Total Shared Price\" style=\"color:white;\">"+formatCurrency(QSharedPrice)+"</a></div>";
+                                    var QFoot3 = "<div><a href=\"#\" title=\"Total Sold Cost\" style=\"color:white;\">"+formatCurrency(QSoldCost)+"</a></div><div><a href=\"#\" title=\"Total Unsold Cost\" style=\"color:white;\">"+formatCurrency(QUnsoldCost)+"</a></div>";
+                                    var QFoot4 = "<div><a href=\"#\" title=\"Total % Sold\" style=\"color:white;\">"+QPercentSold+"%</a></div><div><a href=\"#\" title=\"Total Available Price\" style=\"color:white;\">"+formatCurrency(QUnsoldPrice)+"</a></div>";
+                                    var QFoot5 = "<div><a href=\"#\" title=\"Total Profit\" style=\"color:white;\">"+formatCurrency(QProfit)+"</a></div><div><a href=\"#\" title=\"Total Projected Profit\" style=\"color:white;\">"+formatCurrency(QProjectedProfit)+"</a></div>";
+                                    var QFoot6 = "<div><a href=\"#\" title=\"Avg Price\" style=\"color:white;\">"+formatCurrency(QAvgPrice)+"</a></div><div><a href=\"#\" title=\"Avg Cost\" style=\"color:white;\">"+formatCurrency(QAvgCost)+"</a></div>";
+                                    var QFoot7 = "<div><a href=\"#\" title=\"Total Qty\" style=\"color:white;\">"+QTotalQty+"</a></div><div><a href=\"#\" title=\"Total Total Profit\" style=\"color:white;\">"+formatCurrency(QTotalProfit)+"</a></div>";
+
+                                    var POTable = $('#POTable').DataTable({
+                                        "destroy": true,
+                                        "ordering": true,
+                                        "scrollY": '50vh',
+                                        "scrollX": false,
+                                        "scrollCollapse": true,
+                                        "paging": false,
+                                        "searching": false,
+                                        "info": false,
+                                        "columnDefs": [
+                                            { targets: [13], visible: false },
+                                            { iDataSort: 13, targets: [4] },
+                                            { className: "TableTd", targets: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }
+                                        ],
+                                        "footerCallback": function (tfoot, data, start, end, display) {
+                                            $(tfoot).find('th').eq(1).html(QFoot1);
+                                            $(tfoot).find('th').eq(2).html(QFoot2);
+                                            $(tfoot).find('th').eq(3).html(QFoot3);
+                                            $(tfoot).find('th').eq(4).html(QFoot4);
+                                            $(tfoot).find('th').eq(5).html(QFoot5);
+                                            $(tfoot).find('th').eq(6).html(QFoot6);
+                                            $(tfoot).find('th').eq(7).html(QFoot7);
+                                        }
+                                    });
+                                    POTable
+                                         .rows()
+                                         .nodes()
+                                         .to$()
+                                         .addClass('TableTr'),
+                                    setTimeout(function () {
+                                        POTable.draw();
+                                    }, 250);
+                                    $('#myPleaseWait').modal('hide');
+                                },
+                                error: function (xhr, ajaxOptions, thrownError) {
+                                    $('#myPleaseWait').modal('hide');
+                                    alert("Error: PO Search /" + thrownError);
+                                }
+                            });
+                        } else {
+                            var URL = "../Dashboard/Search?Input=" + Search;
+                            $.ajax({
+                                type: "GET",
+                                cache: false,
+                                aysnc: true,
+                                url: URL,
+                                success: function (result) {
+                                    var foot = result.length + "&nbsp;events&nbsp;found.";
+                                    var SearchResultTable = $("#SearchResultTable").DataTable().destroy();
+                                    $("#SearchResultTable tbody").empty();
+                                    $.each(result, function (key, value) {
+                                        var Text = "<div class='SearchResult1'>" + value.Description + "</div>";
+                                        var Text2 = Text.toLowerCase();
+                                        var Search2 = Search.toLowerCase();
+                                        var FindAt = Text2.indexOf(Search2);
+                                        var TextNew = Text.substr(0, FindAt) + "<span style='font-weight:bold; color:#525252'>" + Search + "</span>" + Text.substring(FindAt + Search.length, 200);
+                                        var NewRec = "<tr id='Search_" + value.Event_ID + "' onclick=\"fn_SelectEvent('Search_"+value.Event_ID+"',"+value.Event_ID+",0,1);\"><td class='TableTd' style='border:thin black 1px;'>" + value.SortDate +
+                                            "</td><td>" + "<div class='SearchResult1' >" + TextNew + "</div>" +
+                                            "</td></tr>";
+                                        $("#SearchResultTable > tbody").append(NewRec);
+                                    })
+                                    var SearchResultTable = $('#SearchResultTable').DataTable({
+                                        "destroy": true,
+                                        "scrollY": '300px',
+                                        "scrollCollapse": true,
+                                        "paging": false,
+                                        "searching": false,
+                                        "autoWidth": true,
+                                        "info": false,
+                                        "columnDefs": [
+                                            { visible: false, targets: [0] },
+                                        ],
+                                        "footerCallback": function (tfoot, data, start, end, display) {
+                                            $(tfoot).find('th').eq(0).html(foot);
+                                        }
+                                    });
+                                    $("#SearchResult").show();
+                                    $('#myPleaseWait').modal('hide');
+                                },
+                                error: function (xhr, ajaxOptions, thrownError) {
+                                    $('#myPleaseWait').modal('hide');
+                                    alert("Error: Searching /" + thrownError);
+                                }
+                            });
+                        }
+                    }
+                }, 500);
+                setTimeout(function () {
+                    $("#SearchBox").focus();
+                }, 500)
+            }
+        }
+        function fn_SelectInvoice(Invoice) {
+            var w = 860;
+            var h = 900;
+            var URL = "../Invoice/GetInvoice?Invoice_ID=" + Invoice + "&AutoPrint=false";
+            popupWindow(URL, Invoice, w, h);
+        }
+        function fn_AdvancedSearch() {
+            fn_ClearSearch();
+            $('#AdvancedSearchDiv').modal('show');
+        }
+        function fn_MyDBRadio(name) {
+            fn_ClearSearch();
+            $('#MyEvents').css('background-color', 'transparent');
+            $('#EventsImFollowing').css('background-color', 'transparent');
+            $('#ImportantNotes').css('background-color', 'transparent');
+            $('#Sales').css('background-color', 'transparent');
+            $('#MyEventsDiv').hide();
+            $('#EventsImFollowingDiv').hide();
+            $('#ImportantNotesDiv').hide();
+            $("#SalesDiv").hide();
+            $('#NoteAdd').hide();
+            $('#SeeAnothersEvents').hide();
+            $('#SeeAnothersSales').hide();
+            if (name == 'MyEvents') {
+                $('#MyEventsDiv').show();
+                $('#SeeAnothersEvents').show();
+                fn_RedrawMyEvents(vLogin_ID, "MY EVENTS");
+            }
+            if (name == 'Sales') {
+                $('#SalesDiv').show();
+                $('#SeeAnothersSales').show();
+                fn_RedrawSales(vLogin_ID, "MY SALES");
+            }
+            if (name == 'EventsImFollowing') {
+                $('#EventsImFollowingDiv').show();
+                fn_RedrawEventsImFollowing(vLogin_ID);
+            }
+            if (name == 'ImportantNotes') {
+                $('#ImportantNotesDiv').show();
+                $('#NoteAdd').show();
+                fn_RedrawImportantNotes();
+            }
+            $('#' + name).css('background-color', 'rgba(53, 53, 53, 0.32)');
+        }
+        function fn_SelectEvent(Source, Event_ID, PO, Event_Count) {
+            if (PO == 0 && Event_Count > 1)
+                alert('Multiple event without PO filter not allowed!');
+            else {
+                $("#" + Source).css('background-color', 'lightblue');
+                if (Event_Count == 1) {
+                    var Url = "../Inventory/Index?Event_ID=" + Event_ID + "&PO_ID=" + PO;
+                    launchApplication(Url, Source);
+                } else {
+                    $('#myPleaseWait').modal('show');
+                    setTimeout(function () {
+
+                        var vPODate = $("#" + "PODate_" + PO).text();
+                        var vUser = $("#" + "User_" + PO).text();
+                        var vSQ = $("#SQ_" + PO).text();
+                        var vSC = $("#SC_" + PO).text();
+                        var vHQ = $("#HQ_" + PO).text();
+                        var vVP = $("#VP_" + PO).text();
+                        var vPR = $("#PR_" + PO).text();
+                        var vTQ = $("#TQ_" + PO).text();
+                        var vPS = $("#PS_" + PO).text();
+                        var vUQ = $("#UQ_" + PO).text();
+                        var vUC = $("#UC_" + PO).text();
+                        var vHP = $("#HP_" + PO).text();
+                        var vVC = $("#VC_" + PO).text();
+                        var vPP = $("#PP_" + PO).text();
+                        var vTP = $("#TP_" + PO).text();
+                        var vAP = $("#AP_" + PO).text();
+                        var URL = "../Purchase/Search2?PO_ID=" + PO;
+                        $.ajax({
+                            type: "GET",
+                            cache: false,
+                            aysnc: false,
+                            url: URL,
+                            success: function (result) {
+                                var MultiTable = $("#MultiTable").DataTable().destroy();
+                                $("#MultiTable tbody").empty();
+                                var EventCount = 0;
+                                $.each(result, function (key, value) {
+                                    var NewRec = "<tr onclick=\"fn_SelectEvent('POList_" + value.PO_ID + "', " + value.Event_ID + ", " + value.PO_ID + ", 1);\">";
+                                    NewRec += "<td><div class=\"TableText1\"><a href=\"#\" title=\""+value.Broker_Name+"\">"+value.Broker_Company+"</a></div></td>";
+                                    NewRec += "<td><a href=\"#\" class=\"TableLink\" title=\"Click to open Event Page\" >"+value.Event_Name+"</a></td>";
+                                    NewRec += "<td><div class=\"TableText1\"><a href=\"#\" title=\"Event Date\">"+value.Event_Date+"</a></div><div class=\"TableText2\"><a href=\"#\" title=\"Venue Info\">"+value.Venue+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Sold Qty\">"+value.Sold+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Unsold Qty\">"+value.Unsold+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Sold Cost\">"+formatCurrency(value.SoldCost)+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Unsold Cost\">"+formatCurrency(value.UnsoldCost)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Shared Qty\">"+value.Shared+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Shared Price\">"+formatCurrency(value.SharedPrice)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Avg Price\">"+formatCurrency(value.AvgPrice)+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Avg Cost\">"+formatCurrency(value.AvgCost)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Current Profit\">"+formatCurrency(value.Profit)+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Projected Profit\">"+formatCurrency(value.ProjProfit)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Total Qty\">"+value.TotalQty+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Total Profit\">"+formatCurrency(value.TotalProfit)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"% Sold\">"+value.PercentSold+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Profit Margin\">"+value.Margin+"%</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"SH Qty\">"+value.SHQty+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"ROC\">"+value.ROC+"</a></div></td>";
+                                    NewRec += "<td>"+value.Event_Date2+"</td>";
+                                    NewRec += "<td>"+value.PO_Date2+"</td></tr>";
+                                    $("#MultiTable > tbody").append(NewRec);
+                                    EventCount += 1;
+                                })
+                                $("#ModalPOHeader").text("PO: " + PO + "  ON:" + vPODate + "  BY:" + vUser);
+                                $("#FooterTitle").text(+EventCount + " events");
+                                $("#FooterSQ").text(vSQ);
+                                $("#FooterSC").text(vSC);
+                                $("#FooterHQ").text(vHQ);
+                                $("#FooterVP").text(vVP);
+                                $("#FooterPR").text(vPR);
+                                $("#FooterTQ").text(vTQ);
+                                $("#FooterPS").text(vPS);
+                                $("#FooterUQ").text(vUQ);
+                                $("#FooterUC").text(vUC);
+                                $("#FooterHP").text(vHP);
+                                $("#FooterVC").text(vVC);
+                                $("#FooterPP").text(vPP);
+                                $("#FooterTP").text(vTP);
+                                $("#FooterAP").text(vAP);
+                                $("#MultiDiv").modal('show');
+                                var MultiTable = $('#MultiTable').DataTable({
+                                    "ordering": true,
+                                    "scrollY": '60vh',
+                                    "scrollX": false,
+                                    "scrollCollapse": true,
+                                    "paging": false,
+                                    "searching": false,
+                                    "info": false,
+                                    "columnDefs": [
+                                        { targets: [11, 12], visible: false },
+                                        { iDataSort: 12, targets: [1] },
+                                        { iDataSort: 11, targets: [5] }
+                                    ]
+                                });
+                                setTimeout(function () {
+                                    MultiTable.draw();
+                                }, 250);
+                                $('#myPleaseWait').modal('hide');
+                            },
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                $('#myPleaseWait').modal('hide');
+                                alert("Error: Displaying MultiPO /" + thrownError);
+                            }
+                        });
+                    }, 500);
+                }
+            }
+        }
+        function fn_NineList() {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Dashboard/GetNineList";
+            $.ajax({
+                type: "GET",
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    var NineListTable = $("#NineListTable").DataTable().destroy();
+                    $("#NineListTable tbody").empty();
+                    $.each(result, function (key, value) {
+                        var NewRec = "<tr id=\"Nine_"+value.Event_ID+"\" onclick=\"fn_SelectEvent('Nine_"+value.Event_ID+"',"+value.Event_ID+",0,1);\"><td>" + value.Event_Name + '</td><td>' + value.Event_Date + '</td><td>' + value.Venue_Name + '</td><td style=\"text-align:right\">' + value.Listings + '</td><td style=\"text-align:right\">' + value.Tix + '</td><td>' + value.Sort_Date + '</td></tr>';
+                        $("#NineListTable > tbody").append(NewRec);
+                    })
+                    var NineListTable = $('#NineListTable').DataTable({
+                        "destroy": true,
+                        "autoWidth": true,
+                        "ordering": true,
+                        "scrollY": '50vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "columnDefs": [
+                            { iDataSort: 5, targets: [ 1 ] },
+                            { targets: [5], visible: false }
+                        ],
+                        "order": [[ 1, "asc" ]]
+                    });
+
+                    $("#NineListDiv").modal('show');
+                    NineListTable
+                         .rows()
+                         .nodes()
+                         .to$()
+                         .addClass('TableTr');
+                    setTimeout(function () {
+                        NineListTable.draw();
+                    }, 500);
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Getting Nine List /" + thrownError);
+                }
+            });
+        }
+        function fn_UnsharedList() {
+            var Cat_ID = $("#CatList999").find("option:selected").val();
+            $('#myPleaseWait').modal('show');
+            var URL = "../Dashboard/GetUnsharedList?Cat_ID=" + Cat_ID;
+            $.ajax({
+                type: "GET",
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    var UnsharedListTable = $("#UnsharedListTable").DataTable().destroy();
+                    $("#UnsharedListTable tbody").empty();
+                    $.each(result, function (key, value) {
+                        var NewRec = "<tr id='Unshared_"+value.Event_ID+"' onclick=\"fn_SelectEvent('Unshared_"+value.Event_ID+"',"+value.Event_ID+",0,1);\"><td>" + value.Event_Name + "</td><td>" + value.Event_Date + "</td><td>" + value.Venue_Name + "</td><td style='text-align:right;'>" + value.Listings + "</td><td style='text-align:right;'>" + value.Tix + "</td><td>" + value.Sort_Date + "</td></tr>";
+                        $("#UnsharedListTable > tbody").append(NewRec);
+                    })
+                    var UnsharedListTable = $('#UnsharedListTable').DataTable({
+                        "destroy": true,
+                        "autoWidth": true,
+                        "ordering": true,
+                        "scrollY": '50vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "columnDefs": [
+                            { iDataSort: 5, targets: [ 1 ] },
+                            { targets: [5], visible: false }
+                        ],
+                        "order": [[ 1, "asc" ]]
+                    });
+                    $("#UnsharedListDiv").modal('show');
+                    UnsharedListTable
+                          .rows()
+                          .nodes()
+                          .to$()
+                          .addClass('TableTr');
+                    setTimeout(function () {
+                        UnsharedListTable.draw();
+                    }, 500);
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Getting Unshared List /" + thrownError);
+                }
+            });
+        }
+        function fn_UnpricedList() {
+            fn_ClearSearch();
+            $('#myPleaseWait').modal('show');
+            var URL = "../Dashboard/GetUnpricedList";
+            $.ajax({
+                type: "GET",
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    var UnpricedListTable = $("#UnpricedListTable").DataTable().destroy();
+                    $("#UnpricedListTable tbody").empty();
+                    $.each(result, function (key, value) {
+                        var NewRec = "<tr id='Unpriced_"+value.Event_ID+"' onclick=\"fn_SelectEvent('Unpriced_"+value.Event_ID+"',"+value.Event_ID+",0,1);\"><td>" + value.Event_Name + "</td><td>" + value.Event_Date + "</td><td>" + value.Venue_Name + "</td><td style='text-align:right;'>" + value.Listings + "</td><td style='text-align:right;'>" + value.Tix + "</td><td>" + value.Sort_Date + "</td></tr>";
+                        $("#UnpricedListTable tbody").append(NewRec);
+                    })
+                    var UnpricedListTable = $('#UnpricedListTable').DataTable({
+                        "destroy": true,
+                        "autoWidth": true,
+                        "ordering": true,
+                        "scrollY": '50vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "columnDefs": [
+                            { iDataSort: 5, targets: [ 1 ] },
+                            { targets: [5], visible: false }
+                        ],
+                        "order": [[ 1, "asc" ]]
+                    });
+                    $("#UnpricedListDiv").modal('show');
+                    UnpricedListTable
+                          .rows()
+                          .nodes()
+                          .to$()
+                          .addClass('TableTr');
+                    setTimeout(function () {
+                        UnpricedListTable.draw();
+                    }, 500);
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Getting Unpriced List /" + thrownError);
+                }
+            });
+        }
+        function fn_AddNote() {
+            $("#AddNoteDiv").modal('show');
+            $("#NewNoteText").val("");
+            setTimeout(function () {
+                $("#NewNoteText").focus();
+            }, 500)
+        }
+        function fn_SaveNewNote() {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Dashboard/AddNote";
+            var NewNote = $("#NewNoteText").val();
+            $.ajax({
+                type: "POST",
+                data: {
+                    Message: NewNote,
+                    Login_ID: vLogin_ID
+                },
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#AddNoteDiv").modal('hide');
+                    fn_RedrawImportantNotes();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Adding note /" + thrownError);
+                    $('#myPleaseWait').modal('hide');
+                }
+            });
+        }
+        function fn_GetPeopleSales() {
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var URL = "../Dashboard/GetPeopleSales";
+                setTimeout(function () {
+                    $.ajax({
+                        type: "GET",
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            SalesListTable.destroy();
+                            $('#SalesListTable tbody').empty();
+                            $.each(result, function (key, value) {
+                                $("#SalesListTable tbody").append(
+                                    "<tr id=" + value.Login_ID + " onclick='fn_RedrawSales(" + value.Login_ID + ",\"" + value.FullName +  "\");'><td>" + value.FullName + '</td><td style=\"text-align:right;\">'+ value.Invoices + "</td></tr>"
+                                  );
+                            })
+                            $("#SalesListDiv").modal('show');
+                            SalesListTable = $("#SalesListTable").DataTable({
+                                "destroy": true,
+                                "ordering": true,
+                                "scrollY": '50vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false,
+                            })
+                            $('#myPleaseWait').modal('hide');
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Getting Sales Agents /" + thrownError);
+                        }
+                    });
+                }, 250);
+            }, 250);
+        }
+        function fn_GetPeopleAssigned() {
+            fn_ClearSearch();
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var URL = "../Dashboard/GetPeopleAssigned";
+                setTimeout(function () {
+                    $.ajax({
+                        type: "GET",
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            AssignedTable.destroy();
+                            $('#AssignedTable tbody').empty();
+                            $.each(result, function (key, value) {
+                                $("#AssignedTable tbody").append(
+                                    "<tr class='User_ID' id=" + value.Login_ID + " onclick='fn_RedrawMyEvents(" + value.Login_ID + ",\"" + value.AssignedName +  "\");'><td>" + value.AssignedName + '</td><td style=\"text-align:right;\">'+ value.UserInfo + "</td></tr>"                                  );
+                            })
+                            AssignedTable = $('#AssignedTable').DataTable({
+                                "destroy": true,
+                                "autoWidth": true,
+                                "ordering": true,
+                                "scrollY": '50vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false
+                            });
+                            
+                            $("#AssignedDiv").modal('show');
+                            setTimeout(function () {
+                                AssignedTable.draw();
+                            }, 250);
+                            $('#myPleaseWait').modal('hide');
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Getting Assigned Users /" + thrownError);
+                        }
+                    });
+                }, 250);
+            }, 250);
+        }
+        function fn_RedrawMyEvents(Login_ID, Name) {
+            $("#AssignedDiv").modal('hide');
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var URL = "../Dashboard/GetMyEvents?Login_ID=" + Login_ID;
+                setTimeout(function () {
+                    $.ajax({
+                        type: "GET",
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            var MyEventsTable = $("#MyEventsTable").DataTable().destroy();
+                            $("#MyEventsTable tbody").empty();
+                            $.each(result, function (key, value) {
+                                var NewRec = "<tr id='MyEvents_"+value.Event_ID+"' onclick=\"fn_SelectEvent('MyEvents_"+value.Event_ID+"',"+value.Event_ID+",0,1);\">"
+                                    +"<td><a href=\"#\" class=\"TableLink\">"+value.Event_Name+"</a></td>"
+                                    +"<td><div class=\"TableText1\">"+value.Event_Date+"</div><div class=\"TableText2\">"+value.Event_DOW+"</div></td>"
+                                    +"<td><div class=\"TableText1\">"+value.Venue_Name+"</div><div class=\"TableText2\">"+value.Venue_Info+"</div></td>"
+                                    +"<td><div class=\"TableText1\"><a href=\"#\" title=\"Unsold Quantity\">"+value.Available_Qty+"</a></div><div class=\"TableText2\"><a href=\"#\" title=\"Unsold Cost\">"+formatCurrency(value.Available_Cost)+"</a></div></td>"
+                                    +"<td><div class=\"TableText1\"><a href=\"#\" title=\"Sold Quantity\">"+value.Sold_Qty+"</div><div class=\"TableText2\"><a href=\"#\" title=\"Current Profit for event\">"+formatCurrency(value.Sold_Profit)+"</a></div></td>"
+                                    +"<td><div class=\"TableText1\">"+value.LastSoldDate+"</div><div class=\"TableText2\">"+value.LastSoldTime+"</div></td>"
+                                    +"<td><div class=\"TableText1\">"+value.LastPriced+"</div></td>"
+                                    +"<td>"+value.Sort_Date+"</tr>"
+                                $("#MyEventsTable tbody").append(NewRec);
+                            })
+                            var MyEventsTable = $('#MyEventsTable').DataTable({
+                                "destroy": true,
+                                "autoWidth": true,
+                                "ordering": true,
+                                "scrollY": '50vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false,
+                                "columnDefs": [
+                                    { targets: [7], visible: false },
+                                    { iDataSort: 7, targets: [ 1 ] },
+                                    { className: "TableTd", targets: [ 0,1,2,3,4,5,6 ] }
+                                ],
+                                "order": [[ 1, "asc" ]]
+                            });
+                            $('#myPleaseWait').modal('hide');
+                            MyEventsTable
+                                .rows()
+                                .nodes()
+                                .to$()
+                                .addClass('TableTr');
+
+                            setTimeout(function () {
+                                MyEventsTable.draw();
+                            }, 250);
+
+                            if(vLogin_ID  == Login_ID)
+                                Name = "MY EVENTS";
+
+                            $("#MyEventsText").text(Name);
+                            $('#myPleaseWait').modal('hide');
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Getting Assigned Users /" + thrownError);
+                        }
+                    });
+                }, 250);
+            }, 250);
+        }
+        function fn_RedrawSales(Login_ID, Name) {
+            $("#SalesListDiv").modal('hide');
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var URL = "../Dashboard/GetSales?Login_ID=" + Login_ID;
+                setTimeout(function () {
+                    $.ajax({
+                        type: "GET",
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            SalesTable.destroy();
+                            $('#SalesTable tbody').empty();
+
+                            $.each(result, function (key, value) {
+                                var NewRec = "<tr><td><a href='#' onclick='fn_SelectInvoice(" + value.Invoice + ");'>" + value.Invoice + "</a></td>";
+                                NewRec += "<td style='text-align:center; padding-left:5px; padding-right:5px;'>" + value.Created + "</td>";
+                                NewRec += "<td style='padding-left:5px; padding-right:5px;'>" + value.Name + "</td>";
+                                NewRec += "<td style='padding-left:5px;padding-right:5px;'>" + value.Event + "</td>";
+                                NewRec += "<td style='padding-left:5px; padding-right:5px;'>" + value.Date + "</td>";
+                                NewRec += "<td style='text-align:right; padding-left:5px; padding-right:5px;'>" + formatCurrency(value.Price); + "</td>";
+                                NewRec += "<td>" + value.Status + "</td>";
+                                NewRec += "<td style='text-align:right;'><a href='#' title='" + value.Margin + "%'>" + formatCurrency(value.Profit); + "</a></td>";
+                                NewRec += "<td style='text-align:center;'>" + value.External_PO + "</td></tr>";
+                                $("#SalesTable tbody").append(NewRec);
+                            })
+
+                            SalesTable = $('#SalesTable').DataTable({
+                                "destroy": true,
+                                "autoWidth": false,
+                                "ordering": true,
+                                "scrollY": '50vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false,
+                                "order": [[ 0, "desc" ]]
+                            });
+                            setTimeout(function () {
+                                SalesTable.draw();
+                            }, 250);
+
+                            if(vLogin_ID  == Login_ID)
+                                Name = "MY SALES";
+
+                            $("#MySalesText").text(Name);
+                            $('#myPleaseWait').modal('hide');
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Getting Sales /" + thrownError);
+                        }
+                    });
+                }, 250);
+            }, 250);
+        }
+
+        function fn_RedrawEventsImFollowing() {
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var URL = "../Dashboard/GetEventsImFollowing?Login_ID=" + vLogin_ID;
+                setTimeout(function () {
+                    $.ajax({
+                        type: "GET",
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            var EventsImFollowingTable = $("#EventsImFollowingTable").DataTable().destroy();
+                            $("#EventsImFollowingTable tbody").empty();
+                            $.each(result, function (key, value) {
+                                var NewRec = "<tr id='EventsIFollow_"+value.Event_ID+"' onclick=\"fn_SelectEvent('EventsIFollow_"+value.Event_ID+"',"+value.Event_ID+",0,1);\">"
+                                +"<td><a href=\"#\" class=\"TableLink\" >"+value.Event_Name+"</a></td>"
+                                +"<td><div class=\"TableText1\">"+value.Event_Date+"</div><div class=\"TableText2\">"+value.Event_DOW+"</div></td>"
+                                +"<td><div class=\"TableText1\">"+value.Venue_Name+"</div><div class=\"TableText2\">"+value.Venue_Info+"</div></td>"
+                                +"<td><div class=\"TableText1\">"+value.Available_Qty+"</div><div class=\"TableText2\">"+formatCurrency(value.Available_Cost)+"</div></td>"
+                                +"<td><div class=\"TableText1\">"+value.Sold_Qty+"</div><div class=\"TableText2\">"+formatCurrency(value.Sold_Profit)+"</div></td>"
+                                +"<td><div class=\"TableText1\">"+value.LastSoldDate+"</div><div class=\"TableText2\">"+value.LastSoldTime+"</div></td>"
+                                +"<td>"+value.Sort_Date+"</td></tr>"
+                                $("#EventsImFollowingTable tbody").append(NewRec);
+                            })
+                            var EventsImFollowingTable = $('#EventsImFollowingTable').DataTable({
+                                "destroy": true,
+                                "autoWidth": true,
+                                "ordering": true,
+                                "scrollY": '50vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false,
+                                "columnDefs": [
+                                    { targets: [6], visible: false },
+                                    { iDataSort: 6, targets: [ 1 ] },
+                                    { className: "TableTd", targets: [ 0,1,2,3,4,5 ] }
+                                ],
+                                "order": [[ 1, "asc" ]]
+                            });
+                            EventsImFollowingTable
+                                .rows()
+                                .nodes()
+                                .to$()
+                                .addClass('TableTr');
+                            setTimeout(function () {
+                                EventsImFollowingTable.draw();
+                            }, 250);
+
+                            $('#myPleaseWait').modal('hide');
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Getting Events Im Following /" + thrownError);
+                        }
+                    });
+                }, 250);
+            }, 250);
+        }
+        function fn_RedrawImportantNotes() {
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var URL = "../Dashboard/GetNotes";
+                setTimeout(function () {
+                    $.ajax({
+                        type: "GET",
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            var ImportantNotesTable = $('#ImportantNotesTable').DataTable({
+                                "destroy": true,
+                                "autoWidth": true,
+                                "ordering": true,
+                                "scrollY": '50vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false,
+                                "order": [[ 1, "desc"]],
+                                "columnDefs": [
+                                    { targets: [3], visible: false },
+                                    { iDataSort: 3, targets: [ 1 ] },
+                                    { className: "TableTd", targets: [ 0,1,2 ] }
+                                ]
+                            });
+                            ImportantNotesTable.clear()
+                            $.each(result, function (key, value) {
+                                ImportantNotesTable.row.add([
+                                    "<div class=\"TableText1\">"+ value.User+"</div>",
+                                    "<div class=\"TableText1\">"+value.CreatedDate+"</div><div class=\"TableText2\">"+value.CreatedTime+"</div>",
+                                    "<div class=\"TableText1\">"+value.Note+"</div>",
+                                    value.Sort_Date
+                                ]).draw(false);
+                            })
+                            setTimeout(function () {
+                                ImportantNotesTable.draw();
+                            }, 250);
+
+                            ImportantNotesTable
+                                .rows()
+                                .nodes()
+                                .to$()
+                                .addClass('TableTr');
+                            setTimeout(function () {
+                                ImportantNotesTable.draw();
+                            }, 250);
+
+                            $('#myPleaseWait').modal('hide');
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Getting Notes /" + thrownError);
+                        }
+                    });
+                }, 250);
+            }, 250);
+        }
+        $(document).ready(function () {
+            $(".NavBar").css("background-color", "");
+            $("#DB").css("background-color", "#353535");
+            if ($(window).width() > 1135) {
+                $("#IconBar2").show();
+                $("#wrapper").toggleClass("toggled");
+            } else
+                $("#IconBar").show();
+            $('#NoteAdd').hide();
+            $('#EventsImFollowingDiv').hide();
+            $('#ImportantNotesDiv').hide();
+            $('#MyEvents').css('background-color', 'rgba(53, 53, 53, 0.32)');
+            $('#MyEventsDiv').show();
+            $('#SeeAnothersEvents').show();
+            $("#SearchWrapperDiv").show();
+            $("#LoginWrapper").show();
+
+            SalesTable = $('#SalesTable').DataTable({
+                "destroy": true,
+                "autoWidth": true,
+                "ordering": true,
+                "scrollY": '50vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+            });
+            SalesListTable = $("#SalesListTable").DataTable({
+                "destroy": true,
+                "ordering": true,
+                "scrollY": '50vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+            })
+            AssignedTable = $('#AssignedTable').DataTable({
+                "destroy": true,
+                "autoWidth": true,
+                "ordering": true,
+                "scrollY": '50vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false
+            });
+            var MyEventsTable = $('#MyEventsTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "scrollY": '50vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "columnDefs": [
+                    { className: "TableTd", targets: [ 0,1,2,3,4,5,6 ] },
+                     { targets: [7], visible: false },
+                      { iDataSort: 7, targets: [ 1 ] },
+                ],
+                "order": [[ 1, "asc" ]]
+            });
+            var POTable = $('#POTable').DataTable({
+                "ordering": true,
+                "scrollY": '50vh',
+                "scrollX": false,
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "columnDefs": [
+                    { targets: [14,15], visible: false },
+                    { iDataSort: 15, targets: [1] },
+                    { iDataSort: 14, targets: [5] }
+                ]
+            });
+            setTimeout(function () {
+                POTable.draw();
+            }, 250);
+            window.onresize = function() {
+                MyEventsTable.columns.adjust().draw();
+                POTable.columns.adjust().draw();
+                SalesTable.columns.adjust().draw();
+            }
+        });
+    </script>
+}
+<div id="NormalDiv" style="display:flex; width:100%;">
+    <div class="ExceptionBox" style="float:left">
+        <h1 class="-Info">$0 Info</h1>
+        <h1 class="-Listings">@ViewData["999Listings"]</h1>
+        <h1 class="-Listings">@ViewData["999Items"]</h1>
+        <div class="-EVENTS" onclick="javascript: fn_NineList();">
+            @ViewData["999EVENTS"]
+            <i class="material-icons" style="color:#adc72e; margin-top:0px;">trending_flat</i>
+        </div>
+    </div>
+    <div class="ExceptionBox" style="float:left">
+        <h1 class="-Info">Unshared</h1>
+        <h1 class="-Listings">@ViewData["UnsharedListings"]</h1>
+        <h1 class="-Listings">@ViewData["UnsharedItems"]</h1>
+        <div class="-EVENTS" onclick="javascript: fn_UnsharedList();">
+            @ViewData["UnsharedEVENTS"]
+            <i class="material-icons" style="color:#adc72e; margin-top:0px;">trending_flat</i>
+        </div>
+    </div>
+    <div class="ExceptionBox" style="float:left">
+        <h1 class="-Info">Unpriced</h1>
+        <h1 class="-Listings">@ViewData["UnpricedListings"]</h1>
+        <h1 class="-Listings">@ViewData["UnpricedItems"]</h1>
+        <div class="-EVENTS" onclick="javascript: fn_UnpricedList();">
+            @ViewData["UnpricedEVENTS"]
+            <i class="material-icons" style="color:#adc72e; margin-top:0px;">trending_flat</i>
+        </div>
+    </div>
+</div>
+<div style="display:flex; margin-top:30px; width:100%; font-size: 40px; font-weight: 300; line-height: 1.2; color: #353535;">
+    My Dashboard
+</div>
+<div id="MyDashboardWrapper">
+    <div id="MyDashboardBar">
+        <div id="MyEvents" class="MyDashboardButton" onclick="javascript:fn_MyDBRadio('MyEvents');">
+            <i class="material-icons" style="width: 24px; height: 24px; line-height: 1; color: #ffffff; margin:5px;">face</i>
+            <h1 id="MyEventsText" style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#ffffff;">MY&nbsp;EVENTS</h1>
+        </div>
+        <div id="EventsImFollowing" class="MyDashboardButton" onclick="javascript:fn_MyDBRadio('EventsImFollowing');">
+            <i class="material-icons" style="width: 24px; height: 24px; line-height: 1; color: #ffffff; margin:5px;">star_rate</i>
+            <h1 style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#ffffff;">EVENTS&nbsp;I'M&nbsp;FOLLOWING</h1>
+        </div>
+        <div id="Sales" class="MyDashboardButton" onclick="javascript:fn_MyDBRadio('Sales');">
+            <i class="material-icons" style="width: 24px; height: 24px; line-height: 1; color: #ffffff; margin:5px;">attach_money</i>
+            <h1 id="MySalesText" style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#ffffff;">MY SALES</h1>
+        </div>
+        <div id="ImportantNotes" class="MyDashboardButton" onclick="javascript:fn_MyDBRadio('ImportantNotes');">
+            <i class="material-icons" style="width: 24px; height: 24px; line-height: 1; color: #ffffff; margin:5px;">feedback</i>
+            <h1 style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#ffffff;">IMPORTANT&nbsp;NOTES</h1>
+        </div>
+        <div id="NoteAdd" class="MyDashboardButton" onclick="javascript:fn_AddNote();">
+            <i class="material-icons" style="width: 24px; height: 24px; line-height: 1; color: #ffffff; margin:5px;">note_add</i>
+            <h1 style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#ffffff;">NOTE&nbsp;ADD</h1>
+        </div>
+        <div id="SeeAnothersEvents" class="RoundedButton" onclick="javascript: fn_GetPeopleAssigned();">
+            <h1 style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#ffffff;">See&nbsp;another&nbsp;person's&nbsp;events</h1>
+            <i class="material-icons">keyboard_arrow_down</i>
+        </div>
+        <div id="SeeAnothersSales" class="RoundedButton" style="display:none;" onclick="javascript: fn_GetPeopleSales();">
+            <h1 style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#ffffff;">See&nbsp;another&nbsp;person's&nbsp;sales</h1>
+            <i class="material-icons">keyboard_arrow_down</i>
+        </div>
+    </div>
+    <div id="MyEventsDiv">
+        <table id="MyEventsTable" class="table-bordered" style="padding-left:10px; border-top:none; border-left:none; border-right:none;">
+            <thead>
+                <tr class="TableTr">
+                    <th style="border:none; border-bottom:solid black 1px;">Event</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Date</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Venue</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Available</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Sold</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Last&nbsp;Sold</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Last&nbsp;Priced</th>
+                    <th>SortDate</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr class="TableTr">
+                        <td id="MyEvents_@item.Event_ID" onclick="fn_SelectEvent('MyEvents_@item.Event_ID', @item.Event_ID,0,1);"><a href="#" class="TableLink">@item.Event_Name</a></td>
+                        <td><div class="TableText1">@item.Event_Date</div><div class="TableText2">@item.Event_DOW</div></td>
+                        <td><div class="TableText1">@item.Venue_Name</div><div class="TableText2">@item.Venue_Info</div></td>
+                        <td><div class="TableText1"><a href="#" title="Unsold Quantity">@item.Available_Qty</a></div><div class="TableText2"><a href="#" title="Unsold Cost">@string.Format("{0:C}", item.Available_Cost)</a></div></td>
+                        <td><div class="TableText1"><a href="#" title="Sold Quantity">@item.Sold_Qty</a></div><div class="TableText2"><a href="#" title="Current Profit for event">@string.Format("{0:C}", item.Sold_Profit)</a></div></td>
+                        <td><div class="TableText1">@item.LastSoldDate</div><div class="TableText2">@item.LastSoldTime</div></td>
+                        <td><div class="TableText1">@item.LastPriced</div></td>
+                        <td>@item.Sort_Date</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div id="EventsImFollowingDiv" style="display:none">
+        <table id="EventsImFollowingTable" class="table-bordered" style="padding-left:10px; border-top:none; border-left:none; border-right:none;">
+            <thead>
+                <tr class="TableTr">
+                    <th style="border:none; border-bottom:solid black 1px;">Event</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Date</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Venue</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Available</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Sold</th>
+                    <th style="border:none; border-bottom:solid black 1px;">Last&nbsp;Sold</th>
+                    <th>SortDate</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+    <div id="SalesDiv" style="display:none">
+        <table id="SalesTable" class="table-bordered" style="padding-left:10px; border-top:none; border-left:none; border-right:none;" border="0">
+            <thead>
+                <tr class="TableTr">
+                    <th style="border:none; border-bottom:solid black 1px; text-align:center;">Invoice</th>
+                    <th style="border:none; border-bottom:solid black 1px; text-align:center;">Created</th>
+                    <th style="border:none; border-bottom:solid black 1px; text-align:center;">Name</th>
+                    <th style="border:none; border-bottom:solid black 1px; text-align:center;">Event</th>
+                    <th style="border:none; border-bottom:solid black 1px; text-align:center;">Date</th>
+                    <th style="border:none; border-bottom:solid black 1px; text-align:center;">Total</th>
+                    <th style="border:none; border-bottom:solid black 1px; text-align:center;">Status</th>
+                    <th style="border:none; border-bottom:solid black 1px; text-align:center;">Profit</th>
+                    <th style="border:none; border-bottom:solid black 1px; text-align:center;">BuyerPO</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+    <div id="ImportantNotesDiv" style="display:none">
+        <table id="ImportantNotesTable" class="table-bordered" style="padding-left:10px; border-top:none; border-left:none; border-right:none;">
+            <thead>
+                <tr class="TableTr">
+                    <th class="TableTh">User</th>
+                    <th class="TableTh">Date</th>
+                    <th class="TableTh">Note</th>
+                    <th class="TableTh">SortDate</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+</div>
+<div style="display:flex; margin-top:30px; margin-bottom:-30px; width:100%; font-size: 40px; font-weight: 300; line-height: 1.2; color: #353535;">
+    Todays POs
+</div>
+<div id="MyDashboardWrapper">
+    <div id="PODiv" style="width:97%; background-color:transparent; margin-top:0px; float:left; display:block;">
+        <table id="POTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+            <thead>
+                <tr class="TableTr">
+                    <th>PO</th>
+                    <th>PO Date</th>
+                    <th>Status</th>
+                    <th>Vendor</th>
+                    <th>Event</th>
+                    <th>Event&nbsp;Date</th>
+                    <th>Sec/Row</th>
+                    <th style="background-color: rgb(53,53,53); color:white; text-align:right;">Qty</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Cost</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Price</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Profit</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Total</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Stats</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Avg</th>
+                    <th>EventDate2</th>
+                    <th>PODate2</th>
+                </tr>
+            </thead>
+            <tbody>
+                    @foreach (var item in (List<spGet_POList_Result>)ViewData["POList"])
+                    {
+                        <tr id="POList_@item.PO_ID" style="background-color:@((item.Status=="Void")?"Lightgrey":"White")">
+                            <td class="TableTr"><a href="#" style="margin-left:4px;" class="TableLink" title="Click to open PO Page" onclick="fn_SelectPO(@item.PO_ID);">@item.PO_ID</a></td>
+                            <td><div class="TableText2"><a href="#" id="PODate_@item.PO_ID" title="PO Date">@item.PO_Date</a></div><div class="TableText1"><a href="#" id="User_@item.PO_ID" title="User Name">@item.User_Name</a></div></td>
+                            <td><a href="#" id="Status_@item.PO_ID" title="@item.notes">@item.Status</a></td>
+                            <td><div class="TableText1"><a href="#" title="@item.Broker_Name">@item.Broker_Company</a></div></td>
+                            <td><a href="#" class="TableLink" title="Click to open Event Page" onclick="fn_SelectEvent('POList_@item.PO_ID', @item.Event_ID, @item.PO_ID, @item.Event_Count);">@item.Event_Name</a></td>
+                            <td><div class="TableText1"><a href="#" title="Event Date">@item.Event_Date</a></div><div class="TableText2"><a href="#" title="Venue Info">@item.Venue</a></div></td>
+                            <td><div class="TableText1"><a href="#" title="Section">@item.Section</a></div><div class="TableText2"><a href="#" title="Row">@item.Row</a></div></td>
+                            <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="UQ_@item.PO_ID" title="Unsold Qty">@item.Unsold</a></div><div class="TableText1" style="text-align:right"><a href="#" id="SQ_@item.PO_ID" title="Sold Qty">@item.Sold</a></div></td>
+                            <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="UC_@item.PO_ID" title="Unsold Cost">@String.Format("{0:c}", item.UnsoldCost)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="SC_@item.PO_ID" title="Sold Cost">@String.Format("{0:c}", item.SoldCost)</a></div></td>
+                            <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="UP_@item.PO_ID" title="Unsold Price">@String.Format("{0:c}", item.UnsoldPrice)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="SP_@item.PO_ID" title="Sold Price">@String.Format("{0:c}", item.SoldPrice)</a></div></td>
+                            <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="VP_@item.PO_ID" title="Current Profit">@String.Format("{0:c}", item.Profit)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="VC_@item.PO_ID" title="Projected Profit">@String.Format("{0:c}", item.ProjProfit)</a></div></td>
+                            <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="PR_@item.PO_ID" title="Total Quantity">@item.TotalQty</a></div><div class="TableText1" style="text-align:right"><a href="#" id="PP_@item.PO_ID" title="Total Price">@String.Format("{0:c}", item.TotalPrice)</a></div></td>
+                            <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="TQ_@item.PO_ID" title="% Sold (Not Counting Write Off)">@String.Format("{0:P}", item.PercentSold)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="TP_@item.PO_ID" title="Margin">@String.Format("{0:P}", item.Margin)</a></div></td>
+                            <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="PS_@item.PO_ID" title="Agerage Price">@String.Format("{0:c}", item.AvgPrice)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="AP_@item.PO_ID" title="Average Cost">@String.Format("{0:c}", item.AvgCost)</a></div></td>
+                            <td>@item.Event_Date2</td>
+                            <td>@item.PO_Date2</td>
+                        </tr>
+                    }
+            </tbody>
+            <tfoot>
+                <tr style="border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                    <th colspan="7"><label style="width:47px;height:16px;font-size:12px;font-weight:900;line-height:1.33;letter-spacing:0.5px;  color: #ffffff;">&nbsp;&nbsp;@ViewBag.FooterTitle</label></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Unsold Qty" style="color:white;">@ViewBag.UnsoldQty</a></div><a href="#" title="Sold Qty" style="color:white;">@ViewBag.SoldQty</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Unsold Cost" style="color:white;">@ViewBag.UnsoldCost</a></div><a href="#" title="Sold Cost" style="color:white;">@ViewBag.SoldCost</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Unsold Price" style="color:white;">@ViewBag.UnsoldPrice</a></div><a href="#" title="Sold Price" style="color:white;">@ViewBag.SoldPrice</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Current Profit" style="color:white;">@ViewBag.Profit</a></div><a href="#" title="Projected Profit" style="color:white;">@ViewBag.ProjectedProfit</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Total Qty" style="color:white;">@ViewBag.TotalQty</a></div><a href="#" title="Total Revenue" style="color:white;">@ViewBag.TotalRevenue</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Percent Sold" style="color:white;">@ViewBag.PercentSold</a></div><a href="#" title="Margin" style="color:white;">@ViewBag.Margin</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Avg Price" style="color:white;">@ViewBag.AvgPrice</a></div><a href="#" title="Avg Cost" style="color:white;">@ViewBag.AvgCost</a><div></div></th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+<!-- Modal Starts here-->
+<div class="modal loadingModal" id="MultiDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px; width:90%; max-width:90%;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div class="modal-footer" style="float:left;">
+                    <h1 id="ModalPOHeader" style="color:white; margin-top:2px;"></h1>
+                </div>
+                <div class="modal-footer" style="float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_CloseAdvancedSearch()">Close</button>
+                </div>
+            </div>
+            <div class="modal-body" style="width:100%; margin:auto;">
+                <table id="MultiTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                    <thead>
+                        <tr class="TableTr">
+                            <th>Vendor</th>
+                            <th>Event</th>
+                            <th>Event&nbsp;Date</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;">Qty</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Cost</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Shared</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Average</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Profit</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Totals</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Stats</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">SH&nbsp;Stats</th>
+                            <th>EventDate2</th>
+                            <th>PODate2</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr style="border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th colspan="3"><label id="FooterTitle" style="width:47px;height:16px;font-size:12px;font-weight:900;line-height:1.33;letter-spacing:0.5px;  color: #ffffff;"></label></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterSQ" title="Sold Qty" style="color:white;"></a></div><a href="#" id="FooterUQ" title="Unsold Qty" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterSC" title="Sold Cost" style="color:white;"></a></div><a href="#" id="FooterUC" title="Unsold Cost" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterHQ" title="Shared Qty" style="color:white;"></a></div><a href="#" id="FooterHP" title="Shared Price" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterVP" title="Avg Price" style="color:white;"></a></div><a href="#" id="FooterVC" title="Avg Cost" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterPR" title="Profit" style="color:white;"></a></div><a href="#" id="FooterPP" title="Projected Profit" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterTQ" title="Total Qty" style="color:white;"></a></div><a href="#" id="FooterTP" title="Total Profit" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterPS" title="% Sold" style="color:white;"></a></div><a href="#" id="FooterAP" title="Available Price" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"></th>
+                            <th></th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal bs-example-modal-sm" id="AdvancedSearchDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" style="color:white; margin-top:15px; float:left;">Options</h1>
+                <div>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="margin:18pt; background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding:0px;">
+                <div style="width:100%; text-align:center;">
+                    <div style="display:inline-block;">
+                        <div style="display:inline-block; margin:0 auto; float:left;">
+                            <div id="FromDate" style="margin:5px; display:block; float:left;">
+                                <h1 style="width: 31px;height: 16px;font-size: 13px;font-weight: 500;line-height: 1.23;color: #353535; display:block;">From</h1>
+                                <div class="input-group date" data-provide="datepicker" style="width:130px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5;">
+                                    <input type="text" id="StartDateAdv" class="form-control" style="background-color:transparent; border:none;" value="@Session["StartDate"]">
+                                    <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                                        <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="ToDate" style="margin:5px; display:block; float:left;">
+                                <h1 style="width: 31px;height: 16px;font-size: 13px;font-weight: 500;line-height: 1.23;color: #353535;">To</h1>
+                                <div class="input-group date" data-provide="datepicker" style="width:130px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5;">
+                                    <input type="text" id="EndDateAdv" class="form-control" style="background-color:transparent; border:none;" value="@Session["EndDate"]">
+                                    <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                                        <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:block; text-align:center; margin:auto 0; float:left; width:100%; clear:both;">
+                            @Html.DropDownList("CatList", null, new { @class = "RoundedDropDown", @style = "margin-top:10px;", @onchange = "fn_UpdateHeadlinerList();" })
+                        </div>
+                        <div style="display:block; text-align:center; margin:auto 0; margin-top:10px; float:left; width:100%; clear:both;">
+                            @Html.DropDownList("HeadlinerList", null, new { @id = "HeadlinerList", @class = "RoundedDropDown" });
+                        </div>
+                        <div style="display:block; text-align:center; margin:auto 0; margin-top:10px; float:left; width:100%; clear:both;">
+                            @Html.DropDownList("OptionList", null, new { @class = "RoundedDropDown" })
+                        </div>
+                   </div>
+                </div>
+
+                <div class="modal-footer" style="text-align:center;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_Continue();">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="AdvancedSearch2Div" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px; width:1200px; max-width:1200px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="margin-left:10px; margin-top:5px; float:left;">
+                    <h1 style="height:16px; font-size:17px; font-weight:500; line-height:1.23; color:#ffffff;">From</h1>
+                    <div class="input-group date" data-provide="datepicker" style="margin-left:40px; margin-top:-33px; width:140px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5; float:left;">
+                        <input type="text" id="StartDateAdv2" class="form-control" style="background-color:transparent; border:none;" onchange="fn_BuildAdvancedSearch()">
+                        <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                            <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-left:10px; margin-top:5px; float:left;">
+                    <h1 style="height:16px; font-size:17px; font-weight:500; line-height:1.23; color:#ffffff;">To</h1>
+                    <div class="input-group date" data-provide="datepicker" style="margin-left:20px; margin-top:-33px; width:140px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5; float:left;">
+                        <input type="text" id="EndDateAdv2" class="form-control" style="background-color:transparent; border:none;" onchange="fn_BuildAdvancedSearch()">
+                        <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                            <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:left;">
+                    @Html.DropDownList("CatList", null, new { @id = "CatList2", @style="max-width:150px;",  @class = "RoundedDropDown", @onchange = "fn_UpdateHeadlinerList()" })
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:left;">
+                    @Html.DropDownList("HeadlinerList", null, new { @id = "HeadlinerList2", @style = "max-width:150px;", @class = "RoundedDropDown", @onchange = "fn_BuildAdvancedSearch();" });
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:left;">
+                    @Html.DropDownList("OptionList", null, new { @id = "OptionList2", @style = "max-width:150px;", @class = "RoundedDropDown", @onchange = "fn_BuildAdvancedSearch()" })
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:10px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_CloseAdvancedSearch()">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="AdvancedSearchTable2" class="table-bordered table-condensed" style="background-color:white; display:none;">
+                    <thead>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th colspan="5" style="border-bottom:white; border-top:white;"></th>
+                            <th colspan="3" style="border-bottom:black; background-color:rgb(53,53,53); color:white; text-align:center">Available</th>
+                            <th colspan="3" style="border-bottom:white; border-top:white; text-align:center;">Sold</th>
+                        </tr>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th class="TableTh">DUE</th>
+                            <th class="TableTh">Event Date</th>
+                            <th class="TableTh">Event Name</th>
+                            <th class="TableTh">Last Sold</th>
+                            <th class="TableTh">Last Priced</th>
+                            <th class="TableTh" style="background-color:rgb(53,53,53); color:white;">Qty</th>
+                            <th class="TableTh" style="background-color:rgb(53,53,53); color:white;">Cost</th>
+                            <th class="TableTh" style="background-color:rgb(53,53,53); color:white;">Price</th>
+                            <th class="TableTh">Qty</th>
+                            <th class="TableTh">Cost</th>
+                            <th class="TableTh">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th class="TableTh" colspan="5"></th>
+                            <th class="TableTh" style="text-align:right; background-color:rgb(53,53,53); color:white;"></th>
+                            <th class="TableTh" style="text-align:right; background-color:rgb(53,53,53); color:white;"></th>
+                            <th class="TableTh" style="text-align:right; background-color:rgb(53,53,53); color:white;"></th>
+                            <th class="TableTh" style="text-align:right;"></th>
+                            <th class="TableTh" style="text-align:right;"></th>
+                            <th class="TableTh" style="text-align:right;"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="SalesListDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#ecf2f9;">
+            <div class="modal-header" style="margin:10px; margin-bottom:0px; border-radius:6px; background-color:#1c81db;">
+                <label style="font-size:18pt; margin-top:15px; color:white; float:left;">Sales Agents</label>
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="margin:15px; background-color:#aec72d; color:#ffffff;">Close</button>
+            </div>
+            <div class="modal-body" style="align-content:center;">
+                <table id="SalesListTable" class="table-bordered table-condensed" style="margin:auto; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                    <thead>
+                        <tr style="height:30px;">
+                            <th>User</th>
+                            <th>Sales</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal bs-example-modal-sm" id="AssignedDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#ecf2f9;">
+            <div class="modal-header" style="margin:10px; margin-bottom:0px; border-radius:6px; background-color:#1c81db;">
+                <label style="font-size:18pt; margin-top:15px; color:white; float:left;">Assigned</label>
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="margin:15px; background-color:#aec72d; color:#ffffff;">Close</button>
+            </div>
+            <div class="modal-body" style="align-content:center;">
+                <table id="AssignedTable" class="table-bordered table-condensed" style="margin:auto; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                    <thead>
+                        <tr style="height:30px;">
+                            <th>User</th>
+                            <th>Events</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="NineListDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="display:block; width:450px; height:70px; margin-left:5px; float:left;">
+                    <h1 class="-Info" style="color:white; float:left;">$0&nbsp;(@ViewData["999Listings"],&nbsp;@ViewData["999Items"],&nbsp;@ViewData["999EVENTS"])</h1>
+                </div>
+                <div style="display:block; margin:10px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="NineListTable" class="table-responsive table-bordered table-condensed" style="border-color:white;">
+                    <thead>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th class="TableTh">Event Name</th>
+                            <th class="TableTh">Event Date</th>
+                            <th class="TableTh">Venue Name</th>
+                            <th class="TableTh">Listings</th>
+                            <th class="TableTh">Tix</th>
+                            <th>Sort_Date</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="UnsharedListDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="display:block; width:450px; height:70px; margin-left:5px; float:left;">
+                    <h1 class="-Info" style="color:white; float:left;">Unshared&nbsp;(@ViewData["UnsharedListings"],&nbsp;@ViewData["UnsharedItems"],&nbsp;@ViewData["UnsharedEVENTS"])</h1>
+                    <h1 class="-EVENTS" style="text-align:left; margin-left:15px; margin-top:-10px; color:white; float:left;">Category Filter:@Html.DropDownList("CatList", null, new { @id = "CatList999", @style = "color:#656565; margin-left:10px;", @class = "RoundedDropDown", @onchange = "javascript:fn_UnsharedList();" })</h1>
+                </div>
+                <div style="display:block; margin:10px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+           <div class="modal-body">
+                <table id="UnsharedListTable" class="table-responsive table-bordered table-condensed" style="border-color:white;">
+                    <thead>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th class="TableTh">Event Name</th>
+                            <th class="TableTh">Event_Date</th>
+                            <th class="TableTh">Venue_Name</th>
+                            <th class="TableTh">Listings</th>
+                            <th class="TableTh">Tix</th>
+                            <th>Sort_Date</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="UnpricedListDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="display:block; width:450px; height:70px; margin-left:5px; float:left;">
+                    <h1 class="-Info" style="color:white; float:left;">Unpriced&nbsp;(@ViewData["UnpricedListings"],&nbsp;@ViewData["UnpricedItems"],&nbsp;@ViewData["UnpricedEVENTS"])</h1>
+                </div>
+                <div style="display:block; margin:10px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="UnpricedListTable" class="table-responsive table-bordered table-condensed" style="border-color:white;">
+                    <thead>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th class="TableTh">Event Name</th>
+                            <th class="TableTh">Event Date</th>
+                            <th class="TableTh">Venue Name</th>
+                            <th class="TableTh">Listings</th>
+                            <th class="TableTh">Tix</th>
+                            <th class="TableTh">Sort_Date</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="AddNoteDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" style="color:white; float:left;">New&nbsp;Note</h1>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <textarea id="NewNoteText" rows="6" style="width:100%; height:100%"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" style="background-color:#aec72d; color:#ffffff;" onclick="fn_SaveNewNote();">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal Ends here-->

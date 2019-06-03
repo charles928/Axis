@@ -1,0 +1,413 @@
+﻿@model IEnumerable<spGet_714List_Result>
+@{
+    ViewBag.Title = "Reference";
+}
+@section scripts {
+    <script type="text/javascript">
+        var BrokerTable;
+        var ExceptionTable;
+        var MissingTable;
+        function launchApplication(l_url, l_windowName) {
+            if (typeof launchApplication.winRefs == 'undefined') {
+                launchApplication.winRefs = {};
+            }
+            if (typeof launchApplication.winRefs[l_windowName] == 'undefined' || launchApplication.winRefs[l_windowName].closed) {
+                var l_width = screen.availWidth;
+                var l_height = screen.availHeight;
+
+                var l_params = 'status=1' +
+                               ',resizable=1' +
+                               ',scrollbars=1' +
+                               ',width=' + l_width +
+                               ',height=' + l_height +
+                               ',left=0' +
+                               ',top=0';
+
+                launchApplication.winRefs[l_windowName] = window.open(l_url, l_windowName);//, l_params);
+                launchApplication.winRefs[l_windowName].moveTo(0, 0);
+                launchApplication.winRefs[l_windowName].resizeTo(l_width, l_height);
+            } else {
+                launchApplication.winRefs[l_windowName].focus()
+            }
+        }
+        function fn_SelectEvent(Event_ID) {
+            $("#TR_" + Event_ID).css('background-color', 'lightblue');
+            var Url = "../Inventory/Index?Event_ID=" + Event_ID + "&PO_ID=0";
+            launchApplication(Url, "#TR_" + Event_ID);
+        }
+        function fn_SaveNewException() {
+            var NewException = $("#AddException").val();
+            var NewPerformerID = $("#PerformerList").val();
+            if (NewException.length > 2) {
+                $("#MyPleaseWait").modal('show');
+                var URL = "../Reference/NewException?Performer_ID=" + NewPerformerID + "&Exception=" + NewException;
+                $.ajax({
+                    type: 'POST',
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        location.reload();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Adding New Exception  /" + thrownError);
+                    }
+                });
+            } else {
+                alert("Exception must be at lease 3 characters long.")
+                $("#AddException").focus();
+                $("#AddException").select();
+            }
+        }
+        function fn_SaveNewShare()
+        {
+            var NewBroker = $("#AddBrokerName").val();
+            var NewCode = $("#AddBrokerCode").val();
+            if (NewBroker.length > 4)
+            {
+                if (NewCode.length > 1)
+                {
+                    $("#MyPleaseWait").modal('show');
+                    var URL = "../Reference/NewBrokerShare?Name=" + NewBroker + "&Code=" + NewCode;
+                    $.ajax({
+                        type: 'POST',
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            location.reload();
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Adding New Share  /" + thrownError);
+                        }
+                    });
+                } else {
+                    alert("Code must be at lease 2 characters long.")
+                    $("#AddBrokerCode").focus();
+                    $("#AddBrokerCode").select();
+                }
+            } else {
+                alert("Broker Name must be at lease 5 characters long.")
+                $("#AddBrokerName").focus();
+                $("#AddBrokerName").select();
+            }
+        }
+        function fn_OpenNewShare()
+        {
+            $("#AddBrokerName").val("");
+            $("#AddBrokerCode").val("");
+            $('#AddBrokerShareDiv').modal('show');
+            $("#AddBrokerName").focus();
+        }
+        function fn_OpenNewException() {
+            $("#AddException").val("");
+            $('#AddExceptionDiv').modal('show');
+            $("#AddException").focus();
+        }
+        function fn_RemoveBroker(Code_ID, Name)
+        {
+            var answer = confirm('Remove Broker Share for ' + Name + ", ARE YOU SURE?");
+            if (answer) {
+                $("#MyPleaseWait").modal('show');
+                var URL = "../Reference/RemoveBrokerShare?Code_ID=" + Code_ID;
+                $.ajax({
+                    type: 'POST',
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        location.reload();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Removing 714 Broker Share  /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_RemoveException(Exception_ID, Name)
+        {
+            var answer = confirm('Remove Exception for ' + Name + ", ARE YOU SURE?");
+            if (answer) {
+                $("#MyPleaseWait").modal('show');
+                var URL = "../Reference/RemoveException?Exception_ID=" + Exception_ID;
+                $.ajax({
+                    type: 'POST',
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        location.reload();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Removing Exception  /" + thrownError);
+                    }
+                });
+            }
+        }
+
+        function fn_UpdateSHFS()
+        {
+            if($("#fullscreen").prop('checked'))
+            {
+                $("#BrokerDiv").hide();
+                $("#ExceptionDiv").hide();
+                $("#MissingDiv").css('height','670px');
+                MissingTable = $('#MissingTable').DataTable({
+                    "destroy": true,
+                    "ordering": true,
+                    "scrollY": '550px',
+                    "scrollX": false,
+                    "scrollCollapse": true,
+                    "paging": false,
+                    "searching": false,
+                    "info": false,
+                });
+            }else{
+                MissingTable = $('#MissingTable').DataTable({
+                    "destroy": true,
+                    "ordering": true,
+                    "scrollY": '180px',
+                    "scrollX": false,
+                    "scrollCollapse": true,
+                    "paging": false,
+                    "searching": false,
+                    "info": false,
+                });
+                $("#MissingDiv").css('height','300px');
+                $("#BrokerDiv").show();
+                $("#ExceptionDiv").show();
+            }
+        }
+
+        $(document).ready(function () {
+            $("#ReferenceWrapper").show();
+            $(".NavBar").css("background-color", "");
+            $("#RE").css("background-color", "#353535");
+            if ($(window).width() > 1135) {
+                $("#IconBar2").show();
+                $("#wrapper").toggleClass("toggled");
+            } else
+                $("#IconBar").show();
+
+            $("#LoginWrapper").show();
+
+            BrokerTable = $('#BrokerTable').DataTable({
+                "ordering": true,
+                "scrollY": "180px",
+                "scrollX": false,
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "columnDefs": [
+                    { targets: [3], orderable: false }
+                ]
+            });
+            ExceptionTable = $('#ExceptionTable').DataTable({
+                "ordering": true,
+                "scrollY": "180px",
+                "scrollX": false,
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "columnDefs": [
+                    { targets: [4], orderable: false }
+                ]
+            });
+            MissingTable = $('#MissingTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "scrollY": "180px",
+                "scrollX": false,
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+            });
+            setTimeout(function () {
+                BrokerTable.draw();
+                ExceptionTable.draw();
+                MissingTable.draw();
+            }, 250);
+            window.onresize = function () {
+                BrokerTable.draw();
+                ExceptionTable.draw();
+                MissingTable.draw();
+            }
+            $('#myPleaseWait').modal('hide');
+        });
+    </script>
+}
+<div id="MyDashboardWrapper" style="width:98%">
+    <div id="BrokerDiv" class="ObjBox" style="height:300px; margin-left:10px; background-color:white; border-radius:4px; box-shadow:0 2px 8px 0; float:left;">
+        <div style="width:100%; float:left;">
+            <label style="margin:10px; font-size:32px; float:left;">714 Brokers</label>
+            <button style="border-radius:16px; margin:10px; background-color:green; color:white; font-size:28px; float:right;" onclick="fn_OpenNewShare();">Add</button>
+        </div>
+        <div id="BrokerTableDiv" style="margin:10px; margin-top:-8px; float:left; display:block; clear:both;">
+            <table id="BrokerTable" class="table-bordered table-condensed" style="margin:0 auto; background-color:papayawhip; border-radius:4px; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                <thead>
+                    <tr style="height:35px; border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                        <th style="color:white; text-align:center;">Broker</th>
+                        <th style="color:white; text-align:center;">Code</th>
+                        <th style="text-align:center; min-width:80px; color:white; text-align:center;">Created</th>
+                        <th style="color:white; text-align:center;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr id="TR_@item.Code_ID">
+                            <td>@item.Name</td>
+                            <td>@item.Code</td>
+                            <td>@item.Created</td>
+                            <td><button style="border-radius:16px; background-color:red; color:white; height:20px;" onclick="fn_RemoveBroker(@item.Code_ID, '@item.Name');">Remove</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr style="height:20px; border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                        <th colspan="4" style="color:white;">@ViewBag.STotal</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    <div id="ExceptionDiv" class="ObjBox" style="width:700px; height:300px; margin-left:10px; background-color:white; border-radius:4px; box-shadow:0 2px 8px 0; float:left;">
+        <div style="width:100%; float:left;">
+            <label style="margin:10px; font-size:32px; float:left;">Exception List</label>
+            <button style="border-radius:16px; margin:10px; background-color:green; color:white; font-size:28px; float:right;" onclick="fn_OpenNewException();">Add</button>
+        </div>
+        <div id="ExceptionTableDiv" style="margin:10px; margin-top:-8px; float:left; display:block;">
+            <table id="ExceptionTable" class="table-bordered table-condensed" style="margin:0 auto; background-color:papayawhip; border-radius:4px; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                <thead>
+                    <tr style="height:35px; border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                        <th style="color:white; text-align:center;">Performer</th>
+                        <th style="color:white; text-align:center;">Exception</th>
+                        <th style="color:white; text-align:center;">Current Events</th>
+                        <th style="color:white; text-align:center;">Created</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in (List<spGet_Exceptions_Result>)ViewData["Exceptions"])
+                    {
+                        <tr id="TR_@item.Exception_ID">
+                            <td>@item.Performer_Name</td>
+                            <td>@item.Name</td>
+                            <td style="text-align:center;"><a href="#" title="@item.EventList">@item.CurrentEvents</a></td>
+                            <td>@item.Created</td>
+                            <td><button style="border-radius:16px; background-color:red; color:white; height:20px;" onclick="fn_RemoveException(@item.Exception_ID, '@item.Name');">Remove</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr style="height:20px; border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                        <th colspan="5" style="color:white;">@ViewBag.ETotal</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    <div id="MissingDiv" class="ObjBox" style="height:300px; margin-top:20px; margin-left:10px; background-color:white; border-radius:4px; box-shadow:0 2px 8px 0; float:left;">
+        <h1 class="-Info" style="margin-top:10px;">Missing From StubHub</h1>
+        <div id="MissingTableDiv" style="margin:10px; margin-top:-8px; float:left; display:block;">
+            <table id="MissingTable" class="table-bordered table-condensed" style="margin:0 auto; background-color:papayawhip; border-radius:4px; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                <thead>
+                    <tr style="height:35px; border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                        <th style="color:white; text-align:center;">Event</th>
+                        <th style="color:white; text-align:center;">Date</th>
+                        <th style="color:white; text-align:center;">Venue</th>
+                        <th style="color:white; text-align:center;">Listings</th>
+                        <th style="color:white; text-align:center;">Tickets</th>
+                        <th style="color:white; text-align:center;">Cost</th>
+                        <th style="color:white; text-align:center;">Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in (List<spGet_MissingFromStubhub_Result>)ViewData["Missing"])
+                    {
+                        <tr id="TR_@item.event_id">
+                            <td><a href="#" onclick="fn_SelectEvent(@item.event_id)">@item.event_name</a></td>
+                            <td>@item.event_date</td>
+                            <td>@item.Venue</td>
+                            <td style="text-align:right">@String.Format("{0:###,###}", item.Listings)</td>
+                            <td style="text-align:right">@String.Format("{0:###,###}", item.Tickets)</td>
+                            <td style="text-align:right">@String.Format("{0:c}", item.Cost)</td>
+                            <td style="text-align:right">@String.Format("{0:c}", item.Price)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr style="height:20px; border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                        <th colspan="3" style="color:white;">@ViewBag.MTotal</th>
+                        <th style="color:white; text-align:right">@ViewBag.MListings</th>
+                        <th style="color:white; text-align:right">@ViewBag.MTickets</th>
+                        <th style="color:white; text-align:right">@ViewBag.MCost</th>
+                        <th style="color:white; text-align:right">@ViewBag.MPrice</th>
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+<!-- Modal Starts here-->
+<div class="modal loadingModal" id="AddBrokerShareDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog" style="border-radius:4px;">
+        <div class="modal-content" style="">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div class="modal-footer" style="float:left;">
+                    <h1 id="ModalPOHeader" style="color:white; margin-top:2px;">New Share</h1>
+                </div>
+                <div class="modal-footer" style="float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body" style="width:100%; margin:auto;">
+                <div style="width:60%; font-size:18px; margin:20px; border:solid black 1px; margin:0 auto; background-color:papayawhip; border-radius:4px; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); float:left;">
+                    <div style="margin:10px;">
+                        <label for="AddBrokerName">Broker:&nbsp;</label><input id="AddBrokerName" />
+                    </div>
+                    <div style="margin:10px;">
+                        <label for="AddBrokerCode">Code:&nbsp;</label><input id="AddBrokerCode" maxlength="3" style="width:40px;" />
+                    </div>
+                </div>
+                <div style="width:35%; margin:5px; float:left;">
+                    <button style="border-radius:16px; height:50px; margin:10px; background-color:cornflowerblue; color:white; font-size:28px; float:right;" onclick="fn_SaveNewShare();">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="AddExceptionDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog" style="border-radius:4px;">
+        <div class="modal-content" style="">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div class="modal-footer" style="float:left;">
+                    <h1 id="ModalPOHeader" style="color:white; margin-top:2px;">New Exception</h1>
+                </div>
+                <div class="modal-footer" style="float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body" style="width:100%; margin:auto;">
+                <div style="width:70%; font-size:18px; margin:20px; border:solid black 1px; margin:0 auto; background-color:papayawhip; border-radius:4px; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); float:left;">
+                    <div style="margin:10px;">
+                        <label for="PerformerList">Performer:&nbsp;</label>@Html.DropDownList("PerformerList", null, new { @id = "PerformerList", @class = "RoundedDropDown", @style="width:200px;" })
+                    </div>
+                    <div style="margin:10px;">
+                        <label for="AddException">Exception:&nbsp;</label><input id="AddException" />
+                    </div>
+                </div>
+                <div style="width:25%; margin:5px; float:left;">
+                    <button style="border-radius:16px; height:50px; margin:10px; background-color:cornflowerblue; color:white; font-size:28px; float:right;" onclick="fn_SaveNewException();">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

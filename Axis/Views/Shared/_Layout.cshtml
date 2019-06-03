@@ -1,0 +1,423 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=1135">
+    <title>@ViewBag.Title</title>
+
+    @Styles.Render("~/Content/css")
+    @Scripts.Render("~/bundles/modernizr")
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="~/Content/Slick/slick.css" />
+    <link rel="stylesheet" href="~/Content/Slick/slick-theme.css" />
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.0.1/fullcalendar.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.18/css/dataTables.bootstrap4.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-multiselect/0.9.13/css/bootstrap-multiselect.css">
+    <style type="text/css">
+        .field-validation-error {
+            color: #ff0000;
+        }
+    </style>
+    @Scripts.Render("~/bundles/jquery")
+    @RenderSection("scripts", required: false)
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="//ajax.aspnetcdn.com/ajax/jquery.validate/1.11.1/jquery.validate.min.js"></script>
+    <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js" integrity="sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb" crossorigin="anonymous"></script>
+    <script src="~/Scripts/Slick/slick.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.18/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/plug-ins/1.10.18/features/pageResize/dataTables.pageResize.min.js"></script>
+    <script src="~/Scripts/bootstrap-datepicker.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-multiselect/0.9.13/js/bootstrap-multiselect.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.16.0/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.0.1/fullcalendar.min.js"></script>
+    <script src="~/Scripts/timepicki.js"></script>
+</head>
+<body style="background-color: #ecf2f9; font-family:Calibri;font-size: 13px; font-weight:100;line-height: 1.23; min-width:1135px;">
+    <div id="TopBar" style="width:100%;">
+        <div id="LogoWrapper" style="width:700px;">
+            <img id="Logo" src="~/Images/axis-logo.jpg" height="50" />
+        </div>
+    </div>
+    <div style="width:90%;background-color:transparent; margin-left:120px;margin-top:-250px; height:100px; display:flex; justify-content:space-between; float:left;">
+ 
+        <div id="SearchWrapperDiv" style="height:100px; display:none; margin-left:40px; width:500px; float:left;">
+            <div style="width:25px; margin-top:35px; display:block; float:left; ">
+                <div id="ClearSearch" style="display:none;" onclick="fn_ClearSearch();"><i class="material-icons">cancel</i></div>
+            </div>
+            <div id="SearchWrapper1" class="SearchWrapper">
+                <input id="SearchBox" class="SearchBox" placeholder="Search 360Access Inventory" onkeyup="doDelayedSearch(event)" autofocus />
+                <div id="SearchResult" style="margin-left:-208px; margin-top:400px; width:750px; z-index:5000;">
+                    <table id="SearchResultTable" style="background-color:transparent;padding:5px;" border="0">
+                        <thead style="display:none">
+                            <tr>
+                                <th>SortDate</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr><th></th><th id="SearchResultFooter">ResultFooter</th></tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div id="AdvancedSearchButton" data-dismiss="modal" style="margin-left:10px;margin-top:35px; padding-left:10px; width:140px; " onclick="fn_AdvancedSearch();">
+                <h1 style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#ffffff;">Advanced&nbsp;Search</h1>
+                <i class="material-icons">keyboard_arrow_down</i>
+            </div>
+            <div class="InvoiceInfo" style="display:none; margin-top:25px; float:left;">
+                <div style="float:left;">
+                    <label id="DisplayInvoice_ID" style="font-size:28pt; margin-right:10px; font-weight:bold; float:left;"></label>
+                </div>
+                <div style="float:left;">
+                    <button class="RoundedButton" style="margin-right:10px; margin-top:23px;" onclick="fn_DisplayInvoice();">Display Invoice</button>
+                </div>
+                <div style="float:left;">
+                    <button class="RoundedButton" style="margin-right:10px; margin-top:23px;" onclick="fn_ResetPage();">Begin New Sale</button>
+                </div>
+            </div>
+            <div id="PageReset2" style="display:none; float:left; margin-top:23px;" onclick="fn_ResetPage();">
+                <i class="material-icons" style="font-size:32px; color:#adc72e;">restore_page</i>
+            </div>
+        </div>
+               
+        <div id="SearchWrapper2" style="margin-left:50px; margin-top:20px; height:60px;border-radius:4px; background-color:rgba(53,53,53,0.32); box-shadow:0 4px 32px 0 rgba(255,255,255,0.32); position:relative; align-items:center; display:none; float:left; clear:both;">
+            <div style="display:inline-block; float:left; margin-top:2px; margin-left:10px; margin-right:10px;">
+                <label for="StartDate2" style="display:block; color:white;">From</label>
+                <input type="text" id="StartDate2" class="input-group date" data-provide="datepicker" style="text-align:left; background-color:white; height:25px; width:80px; border-radius:4px;" value="@Session["StartDate2"]" onchange="fn_UpdateIL();">
+            </div>
+            <div style="display:inline-block; float:left; margin-top:2px; margin-right:10px;">
+                <label for="EndDate2" style="display:block; color:white;">To</label>
+                <input type="text" id="EndDate2" class="input-group date" data-provide="datepicker" style="text-align:left; background-color:white; height:25px; width:80px; border-radius:4px;" value="@Session["EndDate2"]" onchange="fn_UpdateIL();">
+            </div>
+            <div style="display:inline-block; float:left; margin-top:2px; margin-right:10px;">
+                <label for="Type2" style="display:block; color:white;">Status</label>
+                <select class="RoundedDropDown" id="Status2" onchange="fn_UpdateIL();">
+                    <option value="0">All</option>
+                    <option value="6">Voids</option>
+                </select>
+            </div>
+            <div style="display:inline-block; float:left; margin-top:2px; margin-right:10px;">
+                <label for="Type2" style="display:block; color:white;">Display</label>
+                <select class="RoundedDropDown" id="Type2" onchange="fn_UpdateIL();">
+                    <option value="All">All</option>
+                    <option value="Normal">Normal</option>
+                    <option value="Category">Category</option>
+                    <option value="Consign">Consign</option>
+                    <option value="Settled">Settled</option>
+                </select>
+            </div>
+            <div style="display:inline-flex; margin-right:10px; margin-top:13px; float:left;">
+                <input type="text" id="SearchBox2" placeholder="Search" class="form-control" style="background-color:white; color:black; border:none; width:80px;" onfocus="fn_EnterSearch();" onkeyup="doDelayedSearch2(event);" />
+            </div>
+        </div>
+        
+        <div id="SearchWrapper3" style="margin-left:70px; margin-top:20px; height:60px;border-radius:4px; background-color:rgba(53,53,53,0.32); box-shadow:0 4px 32px 0 rgba(255,255,255,0.32); position:relative; align-items:center; display:none; float:left; clear:both;">
+            <div style="display:inline-block; float:left; margin-top:2px; margin-left:10px; margin-right:10px;">
+                <label for="esStart" style="display:block; color:white;">From</label>
+                <input type="text" id="esStart" class="input-group date" data-provide="datepicker" style="text-align:left; background-color:white; height:25px; width:80px; border-radius:4px;" value=@String.Format("{0:MM/dd/yyyy}", Session["esStart"]) onchange="fn_ChangeStart();">
+            </div>
+            <div style="display:inline-block; float:left; margin-top:2px; margin-left:10px; margin-right:10px;">
+                <label for="esEnd" style="display:block; color:white;">To</label>
+                <input type="text" id="esEnd" class="input-group date" data-provide="datepicker" style="text-align:left; background-color:white; height:25px; width:80px; border-radius:4px;" value=@String.Format("{0:MM/dd/yyyy}", Session["esEnd"]) onchange="fn_ChangeEnd();">
+            </div>
+            <div style="display:inline-flex; margin-right:10px; margin-top:13px; float:left;">
+                <input type="text" id="esSearchBox" placeholder="Search Performers" class="form-control" style="background-color:white; color:black; border:none; width:150px;" onkeyup="doDelayedSearchES(event);" />
+            </div>
+        </div>
+        
+        <div id="SearchWrapper4" style="height:100px; display:none; margin-left:50px; width:440px; float:left;">
+            <div style="width:25px; margin-top:35px; display:block; float:left; ">
+                <div id="ClearSearch" style="display:none;" onclick="fn_ClearSearch();"><i class="material-icons">cancel</i></div>
+            </div>
+            <div id="SearchWrapper" class="SearchWrapper">
+                <input id="SearchBox4" class="SearchBox" placeholder="Search Seasons" onkeyup="doDelayedSearch(event)" autofocus />
+            </div>
+            <div id="SeasonRadio" style="background-color:rgba(0,0,0,0.32); box-shadow: 0 4px 32px 0 rgba(255, 255, 255, 0.32); border-radius:6px; margin-left:10px; margin-top:30px; height:40px; display:inline-flex; float:left;">
+                <fieldset style="color:white; padding:5px;margin-top:-6px;">
+                    <input type="radio" name="display" value=0 checked="checked">Pending Seasons<br>
+                    <input type="radio" name="display" value=1>Completed Seasons<br>
+                </fieldset>
+            </div>
+        </div>
+        
+        <div id="SearchWrapper5" style="margin-left:50px; margin-top:20px; height:78px;border-radius:4px; background-color:rgba(53,53,53,0.32); box-shadow:0 4px 32px 0 rgba(255,255,255,0.32); position:relative; align-items:center; display:none; float:left; clear:both;">
+            <div id="TopLine" style="display:block; float:left;">
+                <div style="display:block; float:left;">
+                    <div style="display:inline-block; float:left; margin-top:5px; margin-left:10px; margin-right:10px;">
+                        <label for="StartDate5" style="display:block; color:white;">From</label>
+                        <input type="text" id="StartDate5" class="input-group date" data-provide="datepicker" style="margin-top:-6px; text-align:left; background-color:white; height:25px; width:80px; border-radius:4px;" value="@Session["StartDate2"]" onchange="fn_ChangeStart5();">
+                    </div>
+                    <div style="display:inline-block; float:left; margin-top:5px; margin-right:10px;">
+                        <label for="EndDate5" style="display:block; color:white;">To</label>
+                        <input type="text" id="EndDate5" class="input-group date" data-provide="datepicker" style="margin-top:-6px; text-align:left; background-color:white; height:25px; width:80px; border-radius:4px;" value="@Session["EndDate2"]" onchange="fn_ChangeEnd5();">
+                    </div>
+                    <div style="display:block; clear:both; height:18px; margin-left: 40px; margin-top:8px; float:left;">
+                        <input type="checkbox" id="AllDates" style="margin-left:12px;" onchange="fn_UpdateAD();">
+                        <label for="EventOnly" style="display:inline-block; color:white;">ALL DATES</label>
+                    </div>
+                </div>
+                <div id="SearchType" style="display:block; float:left; margin-left:20px; margin-top:5px;">
+                    <div style="display:block; clear:both; height:18px; float:left;">
+                        <input type="checkbox" id="EventOnly" onchange="fn_UpdateOnly('EventOnly');">
+                        <label for="EventOnly" style="display:inline-block; color:white;">Event Only</label>
+                    </div>
+                    <div style="display:block; clear:both; height:18px; float:left;">
+                        <input type="checkbox" id="VendorOnly" onchange="fn_UpdateOnly('VendorOnly');">
+                        <label for="VendorOnly" style="display:inline-block; color:white;">Vendor Only</label>
+                    </div>
+                    <div style="display:block; clear:both; height:18px; float:left;">
+                        <input type="checkbox" id="AgentOnly" onchange="fn_UpdateOnly('AgentOnly');">
+                        <label for="AgentOnly" style="display:inline-block; color:white;">Agent Only</label>
+                    </div>
+                    <div style="display:block; clear:both; height:18px; float:left;">
+                        <input type="checkbox" id="VoidsOnly" onchange="fn_UpdateOnly('VoidsOnly');">
+                        <label for="VoidsOnly" style="display:inline-block; color:white;">Voids Only</label>
+                    </div>
+                </div>
+                <div style="display:inline-flex; margin-left:10px; margin-top:21px; margin-right:10px; float:left;">
+                    <input type="text" id="SearchBox5" placeholder="Search" class="form-control" style="background-color:white; color:black; border:none; width:120px;" onfocus="fn_EnterSearch5();" onkeyup="doDelayedSearch5(event);" />
+                </div>
+                <div id="PageReset" style="display:none; float:left; margin-top:23px;" onclick="fn_ResetPage();">
+                    <i class="material-icons" style="font-size:32px; color:#adc72e;">restore_page</i>
+                </div>
+            </div>
+        </div>
+        
+        <div id="SearchWrapper6" style="margin-left:50px; margin-top:20px; height:78px;border-radius:4px; background-color:rgba(53,53,53,0.32); box-shadow:0 4px 32px 0 rgba(255,255,255,0.32); position:relative; align-items:center; display:none; float:left; clear:both;">
+            <div id="TopLine" style="display:block; float:left;">
+                <fieldset style="color:white; margin-left:5px; margin-top:8px; margin-right:10px; float:left;" onclick="fn_UpdateRange();">
+                    <input type="radio" name="eventrange" value=7>Next 7 Days<br>
+                    <input type="radio" name="eventrange" value=14>Next 14 Days<br>
+                    <input type="radio" name="eventrange" value=30>Next 30 Days<br>
+                    <input type="radio" name="eventrange" value=0 checked="checked">All Events<br>
+                </fieldset>
+                <div id="InventoryTitle" style="display:inline-flex; margin-left:10px; margin-top:15px; margin-right:10px; font-size:40px; color:white; border:none; float:left;">
+                    <a href="#" style="color:white;" onclick="fn_ResetPage();">Inventory</a><div id="firstdiv" style="display:none">&nbsp;>&nbsp;<a id="firstlink" href="#" onclick="fn_SelectChild(0, '', 0, 0);" style="color:white;">test</a></div><div id="seconddiv" style="display:none">&nbsp;>&nbsp;<a id="secondlink" href="#" style="color:white;">test</a></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="SearchWrapper7" style="margin-left:50px; margin-top:20px; height:78px;border-radius:4px; background-color:rgba(53,53,53,0.32); box-shadow:0 4px 32px 0 rgba(255,255,255,0.32); position:relative; align-items:center; display:none; float:left; clear:both;">
+            <div id="TopLine" style="display:block; float:left;">
+                <fieldset style="color:white; margin-left:5px; margin-top:8px; margin-right:10px; float:left;" onclick="fn_UpdateRange();">
+                    <input type="radio" name="eventrange" value=7>Next 7 Days<br>
+                    <input type="radio" name="eventrange" value=14>Next 14 Days<br>
+                    <input type="radio" name="eventrange" value=30>Next 30 Days<br>
+                    <input type="radio" name="eventrange" value=0 checked="checked">All Events<br>
+                </fieldset>
+                <div id="InventoryTitle" style="display:inline-flex; margin-left:10px; margin-top:15px; margin-right:10px; font-size:40px; color:white; border:none; float:left;">
+                    <a href="#" style="color:white;" onclick="fn_ResetPage();">Spec Inventory</a><div id="firstsdiv" style="display:none">&nbsp;>&nbsp;<a id="firstslink" href="#" onclick="fn_SelectChild(0, '', 0, 0);" style="color:white;">test</a></div><div id="secondsdiv" style="display:none">&nbsp;>&nbsp;<a id="secondslink" href="#" style="color:white;">test</a></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="SearchWrapper8" style="display:none; float:left; clear:both;">
+            <div id="TopLine" style="display:block; float:left;">
+            </div>
+            <div id="TopDDDiv" style="margin-top:30px; margin-left:125px; display:none;">
+                <label for="TopDD" style="color:white;">Calendar for:</label>
+                <select class="RoundedDropDown" id="TopDD" onchange="fn_ChangeTopDD();"></select>
+            </div>
+        </div>
+
+        <div id="SearchWrapper9" style="display:none; float:left; clear:both; margin-left:60px; margin-top:20px;">
+            <img style="height:60px; margin-left:40px; float:left;" src="~/Images/Masters.png" />
+            <div style="display:inline-block; margin-top:7px; margin-left:10px; border-radius:4px; background-color:white; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.5); float:left;">
+                <label for="ScanIn" style="margin:10px; font-size:14pt; ">Scan In:</label>
+                <input id="ScanIn" style="margin:10px; background-color:antiquewhite;" placeholder="Badge Here" onchange="fn_ScanIn(this.value);" />
+            </div>
+        </div>
+
+        <div id="ReferenceWrapper" style="margin-left:75px; margin-top:40px; height:30px;border-radius:4px; background-color:rgba(53,53,53,0.32); box-shadow:0 4px 32px 0 rgba(255,255,255,0.32); position:relative; align-items:center; display:none; float:left; clear:both;">
+            <div id="TopLine" style="display:block; float:left;">
+                <fieldset style="color:white; margin-left:5px; margin-top:8px; margin-right:10px; float:left;" onclick="fn_UpdateSHFS();">
+                    <input type="checkbox" id="fullscreen" value=7>&nbsp;Missing From StubHub Full Screen<br>
+                </fieldset>
+            </div>
+        </div>
+        
+        <div id="TrackingDiv" style="margin-top:40px; margin-left:10px; background-color:transparent; color:white; display:none; float:left;">
+                <div style="float:left;">
+                    <label style="text-align:center; color:white; font-style:italic; font-size:12px;">Enter to Ship</label>
+                </div>
+                <div style="height:60px;border-radius:4px; background-color:rgba(0,0,0,0.32); box-shadow:0 4px 32px 0 rgba(255,255,255,0.32); position:relative; align-items:center; display:inline-block; float:left; clear:both;">
+                    <div style="width:100%; vertical-align:middle; justify-content:space-between;">
+                        <div style="margin-left:5px; margin-right:5px; margin-top:10px; display:inline-flex; float:left;">
+                            <input type="text" id="TrackingNumber" placeholder="Tracking Number" class="form-control" style="background-color:white; color:black; border:none; width:150px;" onkeyup="fn_KeyUpTracking(event);" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="IconBar" style="margin-top:0px; width:200px; display:none; z-index:2;">
+                <div class="Oval" onclick="alert($(window).width())"><i class="material-icons" style="color:white; font-size:24px; margin-left:15px;">email</i></div>
+                <div class="Oval"><i class="material-icons" style="color:white; font-size:24px; margin-left:15px;">notifications</i></div>
+                <div class="Oval menu-toggle" id="menu-toggle"><i class="material-icons" style="color:white; font-size:24px; margin-left:15px;">list</i></div>
+            </div>
+            <div id="LoginWrapper" style="margin-top:0px; display:none; float:right;">
+                <img id="LoginBitmap" class="Photo" src=@ViewData["Photo"] />
+                <div id="NameButton" onclick="javascript: window.location.href = '/Home/Index';">
+                    @ViewData["Name"]
+                    <i class="material-icons">keyboard_arrow_down</i>
+                </div>
+            </div>
+            <div id="IconBar2" style="margin-left:-115px; display:none;">
+                <div class="Oval"><i class="material-icons" style="color:white; font-size:24px; margin-left:15px;">email</i></div>
+                <div class="Oval"><i class="material-icons" style="color:white; font-size:24px; margin-left:15px;">notifications</i></div>
+                <div class="Oval menu-toggle" id="menu-toggle2"><i class="material-icons" style="color:white; font-size:24px; margin-left:15px;">list</i></div>
+            </div>
+        </div>
+    <div id="wrapper">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper">
+            <ul class="sidebar-nav" id="menu">
+                <li class="NavBar" id="DB">
+                    <a href="../Dashboard/Index"><i class="material-icons">dashboard</i>Dashboard</a>
+                </li>
+                <li class="NavBar" id="IN">
+                    <a href="../Inventory/Index2"><i class="material-icons">confirmation_number</i>Inventory</a>
+                </li>
+                <li class="NavBar" id="AP">
+                    <a href="../AutoPrice/Index"><i class="material-icons">track_changes</i>Auto Price</a>
+                </li>
+                <li class="NavBar" id="AL">
+                    <a href="../Alerts/Index"><i class="material-icons">notifications</i>Alerts</a>
+                </li>
+                <li class="NavBar" id="SA">
+                    <a href="../Sales/Index"><i class="material-icons">shopping_cart</i>Sales</a>
+                </li>
+                <li><hr /></li>
+                <li class="NavBar" id="IV">
+                    <a href="../Invoice/Index"><i class="material-icons">assignment</i>Invoice</a>
+                </li>
+                <li class="NavBar" id="PO">
+                    <a href="../Purchase/Index"><i class="material-icons">list</i>PO List</a>
+                </li>
+                <li class="NavBar" id="ES">
+                    <a href="../EventStatus/Index"><i class="material-icons">today</i>Event Status</a>
+                </li>
+                <li class="NavBar" id="MA">
+                    <a href="../Masters/Index"><i class="material-icons">golf_course</i>Masters</a>
+                </li>
+                <li><hr /></li>
+                <li class="NavBar" id="SE">
+                    <a href="../Season/Index" id="navbarDropdownMenuLink" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="material-icons">today</i>Season</a>
+                    <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink" style="margin-left:25px;">
+                        <a class="dropdown-item" onclick="launchApplication('../Season/Dashboard', 'Season Dashboard');" href="#"><i class="material-icons">assistant</i>Dashboard</a>
+                        <a class="dropdown-item" onclick="launchApplication('../Season/Index', 'Season Split');" href="#"><i class="material-icons">call_split</i>Split</a>
+                        <a class="dropdown-item" onclick="launchApplication('../Season/Calendar', 'Season Calendar', null, null);" href="#"><i class="material-icons">calendar_today</i>Calandar</a>
+                        <a class="dropdown-item" onclick="launchApplication('../Season/CreatePO', 'Season Create PO', null, null);" href="#"><i class="material-icons">donut_small</i>Create PO</a>
+                    </div>
+                </li>
+                <li class="NavBar" id="SP">
+                    <a href="../Spec/Index"><i class="material-icons">receipt</i>Spec</a>
+                </li>
+                <li class="NavBar" id="RE">
+                    <a href="../Reference/Index"><i class="material-icons">pageview</i>Reference</a>
+                </li>
+            </ul>
+        </div>
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            @RenderBody()
+        </div>
+        <!-- Modal Start here-->
+        <div class="modal loadingModal bs-example-modal-sm" id="myPleaseWait" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static">
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <img src="~/Images/BBall.gif" width="300" height="150" >
+                </div>
+            </div>
+        </div>
+        <!-- Modal ends Here -->
+        <!-- /#page-content-wrapper -->
+    </div>
+
+    <style type="text/css">
+        .sidebar-nav li a:hover>.dropdown-menu {
+          display: block;
+        }
+        .sidebar-nav li a
+        .dropdown>.dropdown-toggle:active {
+          pointer-events: none;
+        }
+    </style>
+    <script>
+        var timeout = null;
+        function launchApplication(l_url, l_windowName) {
+            if (typeof launchApplication.winRefs == 'undefined') {
+                launchApplication.winRefs = {};
+            }
+            if (typeof launchApplication.winRefs[l_windowName] == 'undefined' || launchApplication.winRefs[l_windowName].closed) {
+                var l_width = screen.availWidth;
+                var l_height = screen.availHeight;
+
+                var l_params = 'status=1' +
+                               ',resizable=1' +
+                               ',scrollbars=1' +
+                               ',width=' + l_width +
+                               ',height=' + l_height +
+                               ',left=0' +
+                               ',top=0';
+
+                launchApplication.winRefs[l_windowName] = window.open(l_url, l_windowName);//, l_params);
+                launchApplication.winRefs[l_windowName].moveTo(0, 0);
+                launchApplication.winRefs[l_windowName].resizeTo(l_width, l_height);
+            } else {
+                launchApplication.winRefs[l_windowName].focus()
+            }
+        }
+        function popupWindow(url, title, w, h) {
+            var left = window.screenX + (screen.width / 2) - (w / 2);
+            var top = (screen.height / 2) - (h / 2);
+            return window.open(url, title, 'toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=yes, copyhistory=no, width=' + w + ', height=' + h + ', top=' + top + ', left=' + left);
+        }
+        function formatCurrency(num) {
+            return formatter.format(num);
+        }
+        var formatter = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+        });
+        function formatCurrency4(num) {
+            return num.toLocaleString("en-US", { style: "currency", currency: 'USD', minimumFractionDigits: 4 })
+        }
+        $(".menu-toggle").click(function (e) {
+            e.preventDefault();
+            $("#wrapper").toggleClass("toggled");
+            if ($("#wrapper").attr("class") == "toggled") {
+                $("#IconBar").hide();
+                $("#IconBar2").show();
+            } else {
+                $("#IconBar2").hide();
+                $("#IconBar").show();
+            }
+            setTimeout(function () {
+                $(window).trigger('resize');
+            }, 400);
+        });
+        $('.date').datepicker({
+            autoclose: true,
+            format: "mm/dd/yyyy"
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

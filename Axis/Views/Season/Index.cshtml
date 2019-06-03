@@ -1,0 +1,611 @@
+﻿@model IEnumerable<spGet_SeasonList_Result>
+@{
+    ViewBag.Title = "STH Split";
+}
+@section scripts {
+    <style type="text/css">
+        .dataTables_filter {
+            display: none;
+        }
+    </style>
+    <script type="text/javascript">
+        var TicketGroup_ID = 0;
+        var PurchaseOrder_ID = 0;
+        var TotalCost = 0;
+        var SeatCount = 0;
+        var FaceSuggest = true;
+        var PriceSuggest = true;
+        var State = "";
+        var CurCost = 0; // needed to capture event and cost on enter
+        
+        function fn_SelectPO(PO) {
+            var w = 860;
+            var h = 900;
+            var URL = "../Purchase/GetPO?PO_ID=" + PO;
+            popupWindow(URL, "PO", w, h);
+        }
+        function fn_AddEvents() {
+            var Data = "";
+            $('.ExCheckBox').each(function () {
+                if ($(this).prop("checked"))
+                    Data += "~" + this.id.replace("Check_", "");
+            });
+            $.ajax({
+                url: "/Season/AddExchangeEvent?Ticket_Group_ID=" + TicketGroup_ID,
+                type: 'POST',
+                data: {
+                    SplitString: Data
+                },
+                cache: false,
+                aysnc: false,
+                success: function (response) {
+                    alert(response);
+                    if (response == "success")
+                        location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Error adding events: ' + thrownError);
+                }
+            });
+        }
+        function fn_ChangeAllExchange() {
+            if ($("#ExchangeAll").prop("checked"))
+                $(".ExCheckBox").prop("checked", true);
+            else
+                $(".ExCheckBox").prop("checked", false);
+        }
+        function fn_Split() {
+            var GoodFace = true;
+            if (State == "TX") {
+                $('.CheckBox').each(function () {
+                    var id = this.id;
+                    if ($("#" + id).prop('checked')) {
+                        var eventid = id.replace('Check_', '');
+                        var FaceValue = $("#Face_" + eventid).val();
+                        if (FaceValue.length < 5) {
+                            alert(id + ' / ' + FaceValue.length);
+                            GoodFace = false;
+                        }
+                    }
+                });
+            }
+            if (GoodFace == false) {
+                alert("Becuase this is a Texas event you must have a valid face on each selected event.");
+            } else {
+                var Data = "";
+                $('.CheckBox').each(function () {
+                    var id = this.id;
+                    if ($("#" + id).prop('checked')) {
+                        var eventid = id.replace('Check_', '');
+                        Data += '~' + eventid + '|' + $("#Face_" + eventid).val().replace("$", "").replace(",", "") + '`' + $("#Cost_" + eventid).val().replace("$", "").replace(",", "") + '^' + $("#Price_" + eventid).val().replace("$", "").replace(",", "");
+                    }
+                });
+                $.ajax({
+                    url: "/Season/SplitListing?Listing_ID=" + TicketGroup_ID,
+                    type: 'POST',
+                    data: {
+                        SplitString: Data
+                    },
+                    cache: false,
+                    aysnc: false,
+                    success: function (response) {
+                        alert(response);
+                        if (response == "success")
+                            location.reload();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert('Error splitting item: ' + thrownError);
+                    }
+                });
+            }
+        }
+
+        function fn_Reload() {
+            $("#ResetButton").hide();
+            fn_SelectItem(TicketGroup_ID, PurchaseOrder_ID);
+        }
+        function fn_TotalItems() {
+            var CalcCost = 0;
+            var CalcPrice = 0;
+            var RecordCount = 0;
+            $(".CheckBox").each(function() {
+                if(this.checked)
+                {
+                    RecordCount += 1;
+                    var Listing = this.id.replace("Check", "");
+                    CalcCost += parseFloat($("#Cost" + Listing).val().replace("$", "").replace(",", "")) * SeatCount;
+                    CalcPrice += parseFloat($("#Price" + Listing).val().replace("$", "").replace(",", "")) * SeatCount;
+                }
+            });
+            var diff = parseFloat(TotalCost) - parseFloat(CalcCost);
+            if (Math.round(CalcCost) != Math.round(TotalCost)) {
+                var message = '';
+                if (diff > 0)
+                    message = 'You need +' + formatCurrency(diff / SeatCount) + ' on any one item to blance.';
+                else
+                    message = 'You need -' + formatCurrency(diff / SeatCount) + ' on any one item to blance.';
+                $("#Message").text(message);
+                var footcost = "<a style=\"color:red\" href=\"#\" title=\"Total MUST EQUAL " + formatCurrency(TotalCost) + "\">" + formatCurrency(CalcCost) + "</a>"
+                $("#SplitButton").prop('disabled', true);
+            }
+            else {
+                $("#Message").text('');
+                var footcost = "<a style=\"color:white\" href=\"#\" title=\"\">" + formatCurrency(CalcCost) + "</a>"
+                var footprice = "<a style=\"color:white\" href=\"#\" title=\"\">" + formatCurrency(CalcPrice) + "</a>"
+                $("#SplitButton").prop('disabled', false);
+            }
+            $("#FootCount").text(RecordCount + " Items Selected");
+            $("#FootQty").text(RecordCount * SeatCount);
+            $("#FootPrice").html(footprice);
+            $("#FootCost").html(footcost);
+        }
+
+
+
+
+
+        function fn_AdjustCost(Event_ID, Next_ID) {
+            var NumOfSeats = 0;
+            var ChangeAmt = CurCost * SeatCount;
+            var NewCost = $("#Cost_" + Event_ID).val().replace("$", "").replace(",", "");
+            var NewCost2;
+            if (NewCost == 0)
+                NewCost2 = "$0.00";
+            else
+                NewCost2 = formatCurrency4(NewCost);
+            
+            setTimeout(function () {
+                $("#Cost_" + Event_ID).val(NewCost2);
+            }, 50)
+            
+            if (NewCost == 0) {
+                var r = confirm("Do you want to distribute " + formatCurrency4(ChangeAmt) + " across the remaining items?");
+                if (r == true) {
+                    $('.SplitCost').each(function () {
+                        var CurItem = $(this).val();
+                        CurItem = CurItem.replace("$", "").replace(",", "");
+                        if (parseFloat(CurItem) > 0 && $(this).id != "Cost_" + Event_ID)
+                            NumOfSeats += SeatCount;
+                    });
+                    var CPS = ChangeAmt / NumOfSeats;
+
+                    var applied = 0;
+                    var FinalItem = "";
+                    var CurAmt;
+                    var NewTotal = 0;
+                    $('.SplitCost').each(function () {
+                        CurAmt = $(this).val().replace("$", "").replace(",", "");
+                        if (CurAmt != 0) {
+                            FinalItem = this.id; // this is used to capture the final item in the list
+                            var NewAmt = parseFloat(CurAmt) + parseFloat(CPS);
+                            applied += CPS * SeatCount;
+                            $("#" + this.id).val(formatCurrency4(NewAmt));
+                            NewTotal += NewAmt * SeatCount;
+                        }
+                    });
+                    var adjamt = (parseFloat(TotalCost) - parseFloat(NewTotal)) / SeatCount;
+                    
+                    $("#" + FinalItem).val(formatCurrency4(parseFloat($("#" + FinalItem).val().replace("$", "").replace(",", "")) + parseFloat(adjamt)));
+                }
+            }
+            $("#Cost_" + Event_ID).val(formatCurrency4(NewCost));
+            fn_TotalItems();
+            $("#ResetButton").show();
+            CurCost = $("#Cost_" + Next_ID).val().replace("$", "").replace(",", "");
+            $("#Cost_" + Next_ID).focus();
+            $("#Cost_" + Next_ID).select();
+        }
+        function fn_ClickEvent(Event_ID) {
+            var NumOfSeats = 0;
+            var CurCost = $("#Cost_" + Event_ID).val().replace("$", "").replace(",", "");
+            var ChangeAmt = CurCost * SeatCount;
+            var checkstatus = $("#Check_" + Event_ID).prop('checked');
+            if (checkstatus == false) {
+                $("#Face_" + Event_ID).val("");
+                $("#Face_" + Event_ID).prop("disabled", true);
+                $("#Price_" + Event_ID).val("");
+                $("#Price_" + Event_ID).prop("disabled", true);
+                $("#Cost_" + Event_ID).val("");
+                $("#Cost_" + Event_ID).prop("disabled", true);
+                var r = confirm("Do you want to distribute " + formatCurrency(ChangeAmt) + " across the remaining items?");
+                if (r == true) {
+                    $('.SplitCost').each(function () {
+                        if ($(this).val() != "$0.00")
+                            NumOfSeats += SeatCount;
+                    });
+                    var CPS = ChangeAmt / NumOfSeats;
+                    var ChangePerSeat = Math.floor(CPS * 100) / 100;
+                    var applied = 0;
+                    var FinalItem = "";
+                    var CurAmt;
+                    var NewTotal = 0;
+                    $('.SplitCost').each(function () {
+                        CurAmt = $(this).val().replace("$", "").replace(",", "");
+                        if (CurAmt != 0) {
+                            FinalItem = this.id; // this is used to capture the final item in the list
+                            var NewAmt = parseFloat(CurAmt) + parseFloat(ChangePerSeat);
+                            applied += ChangePerSeat * SeatCount;
+                            $("#" + this.id).val(formatCurrency(NewAmt));
+                            NewTotal += NewAmt * SeatCount;
+                        }
+                    });
+                    var adjamt = (parseFloat(TotalCost) - parseFloat(NewTotal)) / SeatCount;
+                    $("#" + FinalItem).val(formatCurrency(parseFloat($("#" + FinalItem).val().replace("$", "").replace(",", "")) + parseFloat(adjamt)));
+                }
+            } else {
+                $("#Face_" + Event_ID).prop("disabled", false);
+                $("#Face_" + Event_ID).val("$0.00");
+                $("#Price_" + Event_ID).prop("disabled", false);
+                $("#Price_" + Event_ID).val("$0.00");
+                $("#Cost_" + Event_ID).prop("disabled", false);
+                $("#Cost_" + Event_ID).val("$0.00");
+                $("#Cost_" + Event_ID).focus();
+                $("#Cost_" + Event_ID).select();
+            }
+            setTimeout(function () {
+                fn_TotalItems();
+                $("#ResetButton").show();
+            }, 250)
+        }
+        function fn_AdjustFace(Event_ID, Next_ID) {
+            var NewFace = formatCurrency($("#Face_" + Event_ID).val().replace("$", "").replace(",", ""));
+            if (FaceSuggest == true) {
+                FaceSuggest = false;
+                var r = confirm("Would you like to adjust all face values to " + NewFace);
+                if (r == true)
+                    $(".CheckBox").each(function() {
+                        if(this.checked)
+                        {
+                            var Listing = this.id.replace("Check", "Face");
+                            $("#"+Listing).val(NewFace);                                
+                        }
+                    });
+                else
+                    $("#Face_" + Event_ID).val(NewFace);
+            }
+            else
+                $("#Face_" + Event_ID).val(NewFace);
+            $("#Face_" + Next_ID).focus();
+            $("#Face_" + Next_ID).select();
+            $("#ResetButton").show();
+        }
+        function fn_AdjustPrice(Event_ID, Next_ID) {
+            var NewPrice = formatCurrency($("#Price_" + Event_ID).val().replace("$", "").replace(",", ""));
+            if (PriceSuggest == true) {
+                PriceSuggest = false;
+                var r = confirm("Would you like to adjust all Price to " + NewPrice);
+                if (r == true)
+                    $(".CheckBox").each(function() {
+                        if(this.checked)
+                        {
+                            var Listing = this.id.replace("Check", "Price");
+                            $("#"+Listing).val(NewPrice);                                
+                        }
+                    });
+                else
+                    $("#Price_" + Event_ID).val(NewPrice);
+            }
+            else
+                $("#Price_" + Event_ID).val(NewPrice);
+            $("#Price_" + Next_ID).focus();
+            $("#Price_" + Next_ID).select();
+            fn_TotalItems();
+            $("#ResetButton").show();
+        }
+        function fn_CostClick(Event_ID) {
+            CurCost = $("#Cost_" + Event_ID).val().replace("$", "").replace(",", "");
+            $("#Cost_" + Event_ID).select();
+        }
+        function fn_GetExchangeEvents() {
+            var Performer = "Unknown";
+            $.ajax({
+                async: false,
+                url: "/Season/JsonMissingEvents?Ticket_Group_ID=" + TicketGroup_ID,
+                datatype: JSON,
+                success: function (response) {
+                    if (response.length > 0) {
+                        $("#ExchangeAll").prop("checked", false);
+                        $(".ExCheckBox").prop("checked", true);
+                        $("#ExchangeTable > TBODY").empty();
+                        jQuery.each(response, function (index, item) {
+                            $("#ExchangeTable > TBODY").append("<tr><td><input class=\"ExCheckBox\" id=\"Check_" + item.Id + "\" type=\"CheckBox\" ><td style=\"text-align:left;\">" + item.Event + "</td><td style=\"text-align:left;\">" + item.EventDate + "</td><td>" + item.Venue + "</td><td>" + item.City + "</td><td>" + item.State + "</td></tr>");
+                            Performer = item.Performer;
+                        });
+                        $("#ExchangeTitle").text(Performer)
+                        $("#ExchangeDiv").modal("show");
+                    }
+                    else {
+                        alert("No matching events found.");
+                    }
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('JsonExchangeEvents error: ' + thrownError);
+                }
+            });
+        }
+        function fn_SelectItem(tg_id, po_id) {
+            $("#myPleaseWait").modal('show');
+            State = "";
+            FaceSuggest = true;
+            PriceSuggest = true;
+            TicketGroup_ID = tg_id;
+            PurchaseOrder_ID = po_id;
+            $.ajax({
+                async: false,
+                url: "/Season/JsonConvertItem?tg_id=" + tg_id,
+                datatype: JSON,
+                success: function (response) {
+                    $("#myPleaseWait").modal('hide');
+                    if (response.length > 0) {
+                        RecordCount = response.length;
+                        TotalCost = response[0].TotalCost;
+                        SeatCount = response[0].Qty;
+
+                        var loopcount = 0;
+                        var ItemCost = TotalCost / SeatCount / RecordCount;
+                        var ItemCost = Math.floor(TotalCost / SeatCount / RecordCount * 10000) / 10000;
+                        var FinalItemExtra = Math.floor((TotalCost - (ItemCost * SeatCount * RecordCount)) / SeatCount * 10000) / 10000;
+                        //var FinalItemExtra = Math.floor((parseFloat(TotalCost) - parseFloat((ItemCost * SeatCount * RecordCount))) * 100000) / 100000 / SeatCount;
+                        $("#SplitTable > TBODY").empty();
+                        jQuery.each(response, function (index, item) {
+                            if (State == "")
+                                State = item.State;
+                            if (item.event_id > 0) {
+                                loopcount += 1;
+                                if (loopcount == RecordCount)  // put and fractional amount in the last item
+                                    $("#SplitTable > TBODY").append("<tr><td><input class=\"CheckBox\" id=\"Check_" + item.event_id + "\" type=\"CheckBox\" Checked=\"Checked\" onclick=\"fn_ClickEvent(" + item.event_id + ");\" ><td style=\"text-align:left;\">" + item.event_name + "</td><td style=\"text-align:left;\">" + item.Event_Date + "</td><td>" + item.Venue + "</td><td>" + item.Section + "</td><td>" + item.Row + "</td><td>" + item.Seats + "</td><td style=\"text-align:right\" >" + item.Qty + "</td><td><input id=\"Face_" + item.event_id + "\"class=\"SplitFace\" style=\"width:60px; text-align:right\" onclick=\"this.select();\" onchange=\"fn_AdjustFace(" + item.event_id + "," + item.NextValue + ");\" value=\"$0.00\" /></td><td><input id=\"Cost_" + item.event_id + "\" class=\"SplitCost\" style=\"width:60px; text-align:right;\" onclick=\"fn_CostClick(" + item.event_id + ");\" onchange=\"fn_AdjustCost(" + item.event_id + "," + item.NextValue + ");\" value=\"" + formatCurrency4((ItemCost + FinalItemExtra)) + "\"/></td><td><input id=\"Price_" + item.event_id + "\"class=\"SplitPrice\" style=\"width:60px; text-align:right\" onclick=\"this.select();\" onchange=\"fn_AdjustPrice(" + item.event_id + "," + item.NextValue + ");\"  value=\"$0.00\" /></td></tr>");
+                                else
+                                    $("#SplitTable > TBODY").append("<tr><td><input class=\"CheckBox\" id=\"Check_" + item.event_id + "\" type=\"CheckBox\" Checked=\"Checked\" onclick=\"fn_ClickEvent(" + item.event_id + ");\" ><td style=\"text-align:left;\">" + item.event_name + "</td><td style=\"text-align:left;\">" + item.Event_Date + "</td><td>" + item.Venue + "</td><td>" + item.Section + "</td><td>" + item.Row + "</td><td>" + item.Seats + "</td><td style=\"text-align:right\" >" + item.Qty + "</td><td><input id=\"Face_" + item.event_id + "\"class=\"SplitFace\" style=\"width:60px; text-align:right\" onclick=\"this.select();\" onchange=\"fn_AdjustFace(" + item.event_id + "," + item.NextValue + ");\" value=\"$0.00\" /></td><td><input id=\"Cost_" + item.event_id + "\" class=\"SplitCost\" style=\"width:60px; text-align:right;\" onclick=\"fn_CostClick(" + item.event_id + ");\" onchange=\"fn_AdjustCost(" + item.event_id + "," + item.NextValue + ");\" value=\"" + formatCurrency4(ItemCost) + "\" /></td><td><input id=\"Price_" + item.event_id + "\"class=\"SplitPrice\" style=\"width:60px; text-align:right\" onclick=\"this.select();\" onchange=\"fn_AdjustPrice(" + item.event_id + "," + item.NextValue + ");\"  value=\"$0.00\" /></tr>");
+                            }
+                        });
+                        $("#SplitDiv").modal("show");
+                        $("#SplitTitle").text("Split item for PO#" + po_id);
+                        fn_TotalItems();
+                    }
+                    else
+                        fn_GetExchangeEvents();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('JsonConvertItem error: ' + thrownError);
+                }
+            });
+        }
+        function fn_ChangeDisplay()
+        {
+            var selValue = $('input[name=display]:checked').val(); 
+            if (selValue == 1)
+            {
+                $("#SeasonTableDiv").hide();
+                $("#PastSeasonDiv").show();
+            } else {
+                $("#PastSeasonDiv").hide();
+                $("#SeasonTableDiv").show();
+            }
+        }
+        function fn_OpenPO(po_id) {
+            alert(po_id);
+        }
+        $(document).ready(function () {
+            $("input[name=display]:radio").change(function () {
+                fn_ChangeDisplay();
+            });
+            $(".NavBar").css("background-color", "");
+            $("#SE").css("background-color", "#353535");
+            if ($(window).width() > 1135) {
+                $("#IconBar2").show();
+                $("#wrapper").toggleClass("toggled");
+            } else
+                $("#IconBar").show();
+            $("#SearchWrapper4").show();
+            $("#LoginWrapper").show();
+            $("#SeasonTableDiv").show();
+
+            table = $('#SeasonTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "scrollY": '500px',
+                "scrollX": false,
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "columnDefs": [
+                    { targets: [0], orderable: false }
+                ],
+                "order": [[1, "asc"]]
+            });
+
+            $('#SearchBox4').on('keyup', function () {
+                table.search(this.value).draw();
+            });
+
+            window.onresize = function () {
+                table.columns.adjust().draw();
+            };
+
+            setTimeout(function () {
+                $("#SearchBox4").focus();
+            }, 250)
+        });
+    </script>
+}
+<div id="SeasonTableDiv" style="width:100%; background-color:transparent; float:left; display:none">
+    <table id="SeasonTable" class="table-condensed table-bordered" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+        <thead>
+            <tr style="height:30px;">
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;"></th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">PO</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Created</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Company</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Event</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Date</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Section</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Row</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Seats</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Qty</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Cost</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Agent</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model)
+        {
+                <tr class="TableTr">
+                    <td style="align-content:center;" ><i class="material-icons" onclick="fn_SelectItem(@item.ticket_group_id, @item.purchase_order_id);">call_split</i></td>
+                    <td style="text-align:center;"><a href="#" onclick="fn_SelectPO(@item.purchase_order_id);">@item.purchase_order_id</a></td>
+                    <td style="text-align:center;">@item.create_date</td>
+                    <td>@item.client_broker_company_name</td>
+                    <td>@item.event_name</td>
+                    <td style="text-align:center;">@item.event_datetime</td>
+                    <td style="text-align:center;">@item.section</td>
+                    <td style="text-align:center;">@item.row</td>
+                    <td style="text-align:center;">@item.Seats</td>
+                    <td style="text-align:center">@item.Qty</td>
+                    <td style="text-align:right;">@string.Format("{0:C}", item.TotalCost)</td>
+                    <td style="text-align:center;">@item.system_user_username</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr style="height:30px; background-color:#1c81db;">
+                <th colspan="9" style="color:white; border-radius:4px;">&nbsp;@ViewData["ItemCount"]</th>
+                <th style="text-align:right; color:white; border-radius:4px;">@ViewData["TotalQty"]</th>
+                <th style="text-align:right; color:white; border-radius:4px;">@ViewData["TotalCost"]</th>
+                <th style="border-radius:4px;"></th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+<div id="PastSeasonDiv" style="width:100%; background-color:transparent; float:left; display:none">
+    <table id="HistoryTable" class="table-condensed table-bordered" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+        <thead>
+            <tr style="height:30px;">
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">PO</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">PO Date</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Event</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Section</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Row</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Seats</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Qty</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Cost</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Split Date</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Agent</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Events</th>
+                <th style="text-align:left; border:none; border-bottom:solid black 1px;">Seats</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in (List<spSeason_History_Result>)ViewData["History"])
+            {
+                <tr class="TableTr">
+                    <td style="text-align:center;"><a href="#" onclick="fn_OpenPO(@item.purchase_order_id);">@item.purchase_order_id</a></td>
+                    <td>@item.create_date</td>
+                    <td>@item.event_name</td>
+                    <td style="text-align:center;">@item.section</td>
+                    <td style="text-align:center;">@item.row</td>
+                    <td style="text-align:center;">@item.Seats</td>
+                    <td style="text-align:center">@item.qty</td>
+                    <td style="text-align:right;">@string.Format("{0:C}", item.Cost)</td>
+                    <td style="text-align:center;">@item.Split</td>
+                    <td style="text-align:center;">@item.Agent</td>
+                    <td style="text-align:center">@item.Events</td>
+                    <td style="text-align:center">@item.Tickets</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr style="height:30px; background-color:#1c81db;">
+                <th colspan="6" style="color:white; border-radius:4px;">&nbsp;@ViewData["SplitCount"]</th>
+                <th style="text-align:right; color:white; border-radius:4px;">@ViewData["SplitQty"]</th>
+                <th style="text-align:right; color:white; border-radius:4px;">@ViewData["SplitCost"]</th>
+                <th colspan="4" style="border-radius:4px;"></th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+<!--Modal Starts-->
+<div class="modal loadingModal" id="SplitDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="float:left;">
+                    <div><label id="SplitTitle" class="-Info" style="color:white; float:left;">Split item for PO$</label></div>
+                    <div><label id="Message" class="-Info" style="font-size:18px; color:white; float:left;"></label></div>
+                </div>
+                <div style="float:left;">
+                    <button id="ResetButton" type="button" class="btn btn-default" style="display:none; margin-top:15px; margin-right:10px; background-color:#aec72d; color:#ffffff;" onclick="fn_Reload();">Reset</button>
+                    <button id="EventButton" type="button" class="btn btn-default" style="margin-top:15px; margin-right:10px; background-color:#aec72d; color:#ffffff;" onclick="fn_GetExchangeEvents();">Add Event(s)</button>
+                    <button id="SplitButton" type="button" class="btn btn-default" style="margin-top:15px; margin-right:10px; background-color:#aec72d; color:#ffffff;" onclick="fn_Split();">Split</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="margin-top:15px; margin-right:10px; background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div style="width:100%; text-align:center; background-color:#f5f5f5; border-radius:4px; display:block;">
+                    <div style="display:inline-block; margin:auto 0; margin-top:10px; margin-bottom:10px;">
+                        <table id="SplitTable" class="table-responsive table-bordered table-condensed" style="background-color:white;" border="0">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Event</th>
+                                    <th>Date</th>
+                                    <th>Venue</th>
+                                    <th>Section</th>
+                                    <th>Row</th>
+                                    <th>Seats</th>
+                                    <th>Qty</th>
+                                    <th>Face</th>
+                                    <th>Cost</th>
+                                    <th>Price</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                            <tfoot>
+                                <tr style="height:30px; background-color:#1c81db;">
+                                    <th colspan="7" id="FootCount" style="color:white; text-align:left; border-radius:4px;">0</th>
+                                    <th id="FootQty" style="color:white; text-align:right; border-radius:4px;">0</th>
+                                    <th></th>
+                                    <th id="FootCost" style="color:white; text-align:right; border-radius:4px;"><a href="#">$0.00</a></th>
+                                    <th id="FootPrice" style="color:white; text-align:right; border-radius:4px;"><a href="#">$0.00</a></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="ExchangeDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:25px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="float:left;">
+                    <div><label id="ExchangeTitle" class="-Info" style="color:white; float:left;">Unknown Performer</label></div>
+                </div>
+                <div style="float:left;">
+                    <button id="AddEventButton" type="button" class="btn btn-default" style="margin-top:15px; margin-right:10px; background-color:#aec72d; color:#ffffff;" onclick="fn_AddEvents();">Add Selected Events</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="margin-top:15px; margin-right:10px; background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div style="width:100%; text-align:center; background-color:#f5f5f5; border-radius:4px; display:block;">
+                    <div style="display:inline-block; margin:auto 0; margin-top:10px; margin-bottom:10px;">
+                        <table id="ExchangeTable" class="table-responsive table-bordered table-condensed" style="background-color:white; margin:auto 0;" border="0">
+                            <thead>
+                                <tr>
+                                    <th><input id="ExchangeAll" type="checkbox" onchange="fn_ChangeAllExchange();" /></th>
+                                    <th>Event</th>
+                                    <th>Date</th>
+                                    <th>Venue</th>
+                                    <th>City</th>
+                                    <th>State</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

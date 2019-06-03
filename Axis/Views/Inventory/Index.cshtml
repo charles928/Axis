@@ -1,0 +1,2647 @@
+﻿@{
+    ViewBag.Title = @ViewData["EventName"];
+}
+@section scripts {
+    <style type="text/css">
+        .dataTables_filter {
+            display: none;
+        }
+        .shortIcon{
+            position:absolute;
+            height:75px;
+            top:10px;
+            width:100px;
+        }
+        img.shortIcon.clear {
+            width: 70px;
+            height: 70px;
+            top: 10px;
+        }
+        img.shortIcon {
+            position: absolute;
+            bottom: 0;
+            width: 100px;
+            height: 100px;
+        }
+    </style>
+
+    <script type="text/javascript">
+        var Event_ID = @ViewData["Event_ID"];
+        var PO_ID = @ViewData["PO_ID"];
+        var SH_Event_ID = @ViewData["SHEvent_ID"];
+        var Mkt_Event_ID = 0;
+        var vLogin_ID = @Session["Login_ID"];
+        var vEventName = "@ViewData["EventName"]";
+        var vVenueCity = "@ViewData["VenueCity"]";
+        var SHMarkup = @Session["SHMarkup"];
+
+        var AvailableTable;
+        var StubhubTable;
+        var SoldTable;
+        var RemoteResult;
+
+        var vListing_ID;
+        var NextID; //used with datatables to get the next record id based on current sort
+        var OldValue; // used for repricing
+        var OldSHValue;
+        var PresaleID=0;
+        var Oldcolor = "";
+        var idx;
+        var MatchType = 'Section';
+        var SecList = "";
+        var ZoneList = "";
+        var QtyFilter = 0;
+
+        function fn_RecalcTotals()
+        {
+            var Quantity = 0;
+            var Cost = 0.00;
+            var Price = 0.00;
+
+            $('#AvailableTable TBODY TR').each(function()
+            {
+                var Listing_ID = 0;
+                Listing_ID = this.id.replace("ATTR_", "");
+                if (Listing_ID > 0)
+                {
+                    Quantity += parseInt($("#AQty_"+Listing_ID).text());
+                    Cost += parseFloat($("#ACost_"+Listing_ID).text().replace("$", "").replace(",", "")) * parseInt($("#AQty_"+Listing_ID).text());
+                    Price += parseFloat($("#Price_"+Listing_ID).val().replace("$", "").replace(",", "")) * parseInt($("#AQty_"+Listing_ID).text());
+                }
+            });
+            $("div.dataTables_scrollFoot #xAvailableCount").text(Quantity);
+            $("div.dataTables_scrollFoot #xAvailableCost").text(formatCurrency(Cost));
+            $("div.dataTables_scrollFoot #xAvailablePrice").text(formatCurrency(Price));
+            
+            Quantity = 0;
+            Price = 0.00;
+            $("#StubhubTable TBODY TR").each(function() {
+                Quantity += parseInt($(this).find("td").eq(3).text());
+                Price += parseFloat($(this).find("td").eq(4).text().replace("$", "").replace(",", "")) * parseInt($(this).find("td").eq(3).text());
+            });
+
+            $("div.dataTables_scrollFoot #SHAvailableQty").text(Quantity);
+            $("div.dataTables_scrollFoot #SHAvailablePrice").text(formatCurrency(Price));
+        }
+        function fn_ChartAvailableQty(ChartLoc)
+        {
+            var Filter;
+            if (MatchType == "Section")
+                Filter = $("#SecList :selected").text();
+            else
+                Filter = $("#ZoneList :selected").text();
+            $.ajax({
+                url: "/Inventory/JsonChart?Event_ID=@ViewData["Event_ID"]&Source_ID=1&Type_ID=3&FilterType=" + MatchType + "&Filter=" + Filter,
+                async:false,
+                type: "GET",
+                dataType: "json",
+                success: function (response) {
+                    $.ajax({
+                        url: "/Inventory/JsonChart?Event_ID=@ViewData["Event_ID"]&Source_ID=2&Type_ID=3&FilterType=" + MatchType + "&Filter=" + Filter,
+                        async:false,
+                        type: "GET",
+                        dataType: "json",
+                        success: function (response2) {
+                            onDataReceivedDouble(ChartLoc, "360Access", "Available", response, "Stubhub", "Available", response2);
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            alert('Get Chart Data Error: ' + thrownError);
+                        }
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Get Chart Data Error: ' + thrownError);
+                }
+            });
+        }
+        function fn_ChartAvgeragePrice(ChartLoc)
+        {
+            var Filter;
+            if (MatchType == "Section")
+                Filter = $("#SecList :selected").text();
+            else
+                Filter = $("#ZoneList :selected").text();
+            $.ajax({
+                url: "/Inventory/JsonChart?Event_ID=@ViewData["Event_ID"]&Source_ID=1&Type_ID=2&FilterType=" + MatchType + "&Filter=" + Filter,
+                async:false,
+                type: "GET",
+                dataType: "json",
+                success: function (response) {
+                    $.ajax({
+                        url: "/Inventory/JsonChart?Event_ID=@ViewData["Event_ID"]&Source_ID=2&Type_ID=2&FilterType=" + MatchType + "&Filter=" + Filter,
+                        async:false,
+                        type: "GET",
+                        dataType: "json",
+                        success: function (response2) {
+                            onDataReceivedDouble(ChartLoc, "360Access", "Avg Price", response, "Stubhub", "Avg Price", response2);
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            alert('Get Chart Data Error: ' + thrownError);
+                        }
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Get Chart Data Error: ' + thrownError);
+                }
+            });
+        }
+        function fn_UpdateGraph() {
+            if ($("#DisplayList :selected").text() == "Graph")
+            {
+                fn_ChartAvailableQty('TopChart');
+                fn_ChartAvgeragePrice('BottomChart');
+            }
+        }
+        function fn_ChangeDisplay(){
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var type = $("#DisplayList :selected").text();
+                if (type == "Normal")
+                {
+                    $("#RemoteTitle").text("Stubhub");
+                    $("#GraphDiv").hide();
+                    $("#StubhubDiv").show();
+                    $("#SoldDiv").show();
+                    $("#PresaleDiv").show();
+                    AvailableTable.destroy();
+                    AvailableTable = $('#AvailableTable').DataTable({
+                        "ordering": true,
+                        "scrollY": '40vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "autowidth": false,
+                        "columnDefs": [
+                            { targets: [20,21,22,23], visible: false },
+                            { targets: [0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], orderable: false },
+                            { targets: [6], iDataSort: 20 },
+                            { targets: [1], iDataSort: 21},
+                            { targets: [2], iDataSort: 22}
+                        ],
+                        "order": [[1, "asc"]]
+                    });
+                    StubhubTable = $('#StubhubTable').DataTable({
+                        "destroy": true,
+                        "autoWidth": true,
+                        "ordering": true,
+                        "scrollY": '40vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "columnDefs": [
+                            { sClass: "TableTd", targets: [ 0,1,2,3,4 ]},
+                        ],
+                        "order": [[1, "asc"]]
+                    });
+                }
+                if (type == "Graph")
+                {
+                    $("#RemoteTitle").text("Graph");
+                    $("#StubhubDiv").hide();
+                    $("#GraphDiv").show();
+                    $("#SoldDiv").show();
+                    $("#PresaleDiv").show();
+                    fn_UpdateGraph();
+                }
+                if (type == "Tall")
+                {
+                    $("#RemoteTitle").text("Stubhub (Tall)");
+                    $("#GraphDiv").hide();
+                    $("#SoldDiv").hide();
+                    $("#PresaleDiv").hide();
+                    $("#StubhubDiv").show();
+                    AvailableTable.destroy();
+                    AvailableTable = $('#AvailableTable').DataTable({
+                        "ordering": true,
+                        "scrollY": '90vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "autowidth": false,
+                        "columnDefs": [
+                            { targets: [20,21,22,23], visible: false },
+                            { targets: [0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], orderable: false },
+                            { targets: [6], iDataSort: 20 },
+                            { targets: [1], iDataSort: 21},
+                            { targets: [2], iDataSort: 22}
+                        ],
+                        "order": [[1, "asc"]]
+                    });
+                    StubhubTable = $('#StubhubTable').DataTable({
+                        "destroy": true,
+                        "autoWidth": true,
+                        "ordering": true,
+                        "scrollY": '90vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "columnDefs": [
+                            { sClass: "TableTd", targets: [ 0,1,2,3,4 ]},
+                        ],
+                        "order": [[1, "asc"]]
+                    });
+                }
+                $('#myPleaseWait').modal('hide');
+            }, 250);
+            setTimeout(function () {
+                $( "#TicketQty" ).trigger( "change" );
+                $( "#SecList" ).trigger( "change" );
+                $( "#Zone" ).trigger( "change" );
+            }, 250);
+        }
+        function gd(year, month, day) {
+            return new Date(year, month - 1, day).getTime();
+        }
+        function getFormattedDate(date) {
+            var year = date.getFullYear();
+            var month = (1 + date.getMonth()).toString();
+            month = month.length > 1 ? month : '0' + month;
+            var day = date.getDate().toString();
+            day = day.length > 1 ? day : '0' + day;
+            return month + '/' + day + '/' + year;
+        }
+        function onDataReceivedSingle(ChartLoc, Source, Type, ds1) {
+            var PlotArray = new Array();
+            for (ii = 0; ii < ds1.length; ++ii) {
+                var dirt = gd(ds1[ii].Year, ds1[ii].Month, ds1[ii].Day);
+                PlotArray[ii] = new Array(dirt, ds1[ii].Amount)
+            }
+            var data = [{
+                label: Source + " " + Type,
+                data: PlotArray
+            }];
+
+            var options = {
+                series: { lines: { show: true }, points: {show: false } },
+                legend: { noColumns: 0, labelBoxBorderColor: "#000000", position: "nw" },
+                grid: { hoverable: true, clickable: true },
+                xaxis: { mode: "time", max: (new Date("@ViewData["ChartDate"]")).getTime() }
+        };
+        $.plot($("#"+ChartLoc), data, options);
+        $("<div id='tooltip'></div>").css({
+            position: "absolute",
+            display: "none",
+            border: "1px solid #fdd",
+            padding: "2px",
+            "background-color": "#fee",
+            opacity: 0.80
+        }).appendTo("body");
+        $(".flotcontainer").bind("plothover", function (event, pos, item) {
+            if (item) {
+                var x = getFormattedDate(new Date(item.datapoint[0])),
+                    y = item.datapoint[1].toFixed(0);
+                $("#tooltip").html(item.series.label + "<br />" + x + "<br />" + y)
+                    .css({ top: item.pageY + 20, left: item.pageX + 20 })
+                    .fadeIn(200);
+            } else {
+                $("#tooltip").hide();
+            }
+        });
+        $("#"+ChartLoc).bind("plotclick", function (event, pos, item) {
+            if (item) {
+                var NewDate = getFormattedDate(new Date(item.datapoint[0]));
+                $.ajax({
+                    url: "/Chart2/JasonQtyPhase1?MinDate=" + NewDate,
+                    datatype: JSON,
+                    success: function (response) {
+                        fnQtyPhase2(NewDate, response);
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert('JsonQtyPhase1 error: ' + thrownError);
+                    }
+                });
+            }
+        });
+        }
+        function onDataReceivedDouble(ChartLoc, Source1, Type1, ds1, Source2, Type2, ds2) {
+            var PlotArray = new Array();
+            for (ii = 0; ii < ds1.length; ++ii) {
+                var dirt = gd(ds1[ii].Year, ds1[ii].Month, ds1[ii].Day);
+                PlotArray[ii] = new Array(dirt, ds1[ii].Amount)
+            }
+            var data = [{
+                label: Source1+" "+Type1,
+                data: PlotArray
+            }];
+            var PlotArray2 = new Array();
+            for (ii = 0; ii < ds2.length; ++ii) {
+                var dirt = gd(ds2[ii].Year, ds2[ii].Month, ds2[ii].Day);
+                PlotArray2[ii] = new Array(dirt, ds2[ii].Amount)
+            }
+            var data = [{
+                label: Source1+" "+Type1,
+                data: PlotArray
+            },{
+                label: Source2+" "+Type2,
+                data: PlotArray2,
+                yaxis: 2
+            }];
+            var options = {
+                colors: ["#FF0000", "#0022FF"],
+                series: { lines: { show: true }, points: {show: false } },
+                legend: { noColumns: 0, labelBoxBorderColor: "#000000", position: "nw" },
+                grid: { hoverable: true, clickable: true },
+                xaxis: { mode: "time", min: (new Date("@Session["CMin"]")).getTime(), max: (new Date("@Session["CMax"]")).getTime() },
+                yaxes: [{}, {position:"right"}]
+            };
+            $.plot($("#"+ChartLoc), data, options);
+            $("<div id='tooltip'></div>").css({
+                position: "absolute",
+                display: "none",
+                border: "1px solid #fdd",
+                padding: "2px",
+                "background-color": "#fee",
+                opacity: 0.80
+            }).appendTo("body");
+            $(".flotcontainer").bind("plothover", function (event, pos, item) {
+                if (item) {
+                    var x = getFormattedDate(new Date(item.datapoint[0])),
+                        y = item.datapoint[1].toFixed(0);
+                    $("#tooltip").html(item.series.label + "<br />" + x + "<br />" + y)
+                        .css({ top: item.pageY + 20, left: item.pageX + 20 })
+                        .fadeIn(200);
+                } else {
+                    $("#tooltip").hide();
+                }
+            });
+            $("#"+ChartLoc).bind("plotclick", function (event, pos, item) {
+                if (item) {
+                    var NewDate = getFormattedDate(new Date(item.datapoint[0]));
+                    $.ajax({
+                        url: "/Chart2/JasonQtyPhase1?MinDate=" + NewDate,
+                        datatype: JSON,
+                        success: function (response) {
+                            fnQtyPhase2(NewDate, response);
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            alert('JsonQtyPhase1 error: ' + thrownError);
+                        }
+                    });
+                }
+            });
+        }
+        function isInt(value) {
+            return !isNaN(value) && (function(x) { return (x | 0) === x; })(parseFloat(value))
+        }
+        function fn_DoBulkUpdate()
+        {
+            $('#myPleaseWait').modal('show');
+            var DollarAmt = $("#ChangeDollars").val();
+             if (DollarAmt.length > 0)
+                if (isNaN(DollarAmt))
+                {
+                    $("#ChangeDollars").focus();
+                    alert('Invalid Price.');
+                    return;
+                }
+            var PercentAmt = $("#ChangePercent").val();
+            if (PercentAmt.length > 0)
+            {
+                if (!isInt(PercentAmt))
+                {
+                    $("#ChangePercent").focus();
+                    alert("Invalid Percent, must be whole number (no decimal).")
+                    return;
+                }
+            }
+            var RemoteTitle = $("#RemoteTitle").text();
+            var HoldType = $("#BulkHold").val();
+            var AddToNotes = $("#AddToNotes").val();
+            var GreenShares = "";
+            var RedShares = "";
+            if ($("#Bulk_SH").css('color') == "rgb(0, 128, 0)")
+                GreenShares += ',SH';
+            if ($("#Bulk_EI").css('color') == "rgb(0, 128, 0)")
+                GreenShares += ',EI';
+            if ($("#Bulk_VI").css('color') == "rgb(0, 128, 0)")
+                GreenShares += ',VI';
+            if ($("#Bulk_SG").css('color') == "rgb(0, 128, 0)")
+                GreenShares += ',SG';
+            if ($("#Bulk_SH").css('color') == "rgb(255, 0, 0)")
+                RedShares += ',SH';
+            if ($("#Bulk_EI").css('color') == "rgb(255, 0, 0)")
+                RedShares += ',EI';
+            if ($("#Bulk_VI").css('color') == "rgb(255, 0, 0)")
+                RedShares += ',VI';
+            if ($("#Bulk_SG").css('color') == "rgb(255, 0, 0)")
+                RedShares += ',SG';
+            Url = "/Inventory/Get714Shares?ListingID=0";
+             $.ajax({
+                async:false,
+                url: Url,
+                success: function (result) {
+                    jQuery.each(result, function(index, item) {
+                        if ($("#Bulk_" + item.Code).css('color') == "rgb(0, 128, 0)")
+                            GreenShares += "," + item.Code;
+                        if ($("#Bulk_" + item.Code).css('color') == "rgb(255, 0, 0)")
+                            RedShares += "," + item.Code;
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: opening 714 shares /" + thrownError);
+                    $('#myPleaseWait').modal('hide');
+                }
+            });
+            var TransactionIDs = '';
+            var SelectedIDs = '';
+            $('#AvailableTable TBODY TR').filter(':has(:checkbox:checked)').each(function() {
+                var CurrentID = this.id.replace("ATTR_", "");
+                var CurrentTrans = $(this).find(".TransactionID").val();
+                if (CurrentTrans != "0")
+                    TransactionIDs += "," + CurrentTrans;
+                SelectedIDs += "," + this.id.replace("ATTR_", "");
+            });
+            var URL = "/Inventory/BulkUpdate"
+            $.ajax({
+                type: 'POST',
+                url: URL,
+                data: {
+                    Title: RemoteTitle,
+                    Listing_IDs: SelectedIDs,
+                    Transaction_IDs: TransactionIDs,
+                    DollarChange: DollarAmt,
+                    PercentChange: PercentAmt,
+                    HoldChange: HoldType,
+                    NotesChange: AddToNotes,
+                    GreenChange: GreenShares,
+                    RedChange: RedShares
+                },
+                success: function (result) {
+                    $("#BulkDiv").css('display', 'none');
+                    $("#AllItems").prop('checked', false);
+                    setTimeout(function () {
+                        fn_AvailableReload();
+                    }, 250);
+                    //alert('Bulk Update Complete!');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Bulk Update /" + thrownError);
+                }
+            });
+         }
+        function fn_KeyChangeDollar()
+        {
+            var NewVal = $("#ChangeDollars").val();
+            $("#ChangePercent").val('');
+            if (NewVal == "")
+                $("#ChangePercent").prop('disabled', false);
+            else
+                $("#ChangePercent").prop('disabled', true);
+        }
+        function fn_KeyChangePercent()
+        {
+            var NewVal = $("#ChangePercent").val();
+            $("#ChangeDollars").val('');
+            if (NewVal == "")
+                $("#ChangeDollars").prop('disabled', false);
+            else
+                $("#ChangeDollars").prop('disabled', true);
+        }
+        function fn_CloseBulkUpdate()
+        {
+            $("#BulkDiv").css('display', 'none');
+        }
+        function fn_BulkShareClick(Broker) {
+            var curcolor = $("#Bulk_" + Broker).css('color');
+            if (curcolor == "rgb(128, 128, 128)") // Grey
+            {
+                $("#Bulk_" + Broker).css('color', 'Green');
+                $("#Bulk_" + Broker).prop('title', 'Change to Shared');
+            }
+            else
+            {
+                if (curcolor == "rgb(0, 128, 0)") // Green
+                {
+                    $("#Bulk_" + Broker).css('color', 'Red');
+                    $("#Bulk_" + Broker).prop('title', 'Change to Not Shared');
+                }
+                else
+                {
+                    $("#Bulk_" + Broker).css('color', 'Grey');
+                    $("#Bulk_" + Broker).prop('title', 'No Change');
+                }
+            }
+        }
+        function fn_GetBulkShareTable()
+        {
+            Url = "/Inventory/Get714Shares?ListingID=0";
+            $.ajax({
+                async:false,
+                url: Url,
+                success: function (result) {
+                    var BulkShareTable = "<table style=\"margin-left:auto; margin-right:auto; background-color:rgba(229,229,229, 0.48)\" border=\"1\"><thead><tr style='background-color:black; color:white;'><th style=\"text-align:center;\" title='Stubhub'>SH</th><th style=\"text-align:center;\" title='Event Inventory'>EI</th><th style=\"text-align:center;\" title='Vivid Seats'>VI</th><th style=\"text-align:center;\" title='Seat Geek'>SG</th>";
+                    jQuery.each(result, function(index, item) {
+                        BulkShareTable += "<th style='text-align:center;' title='"+item.Name+"' >"+item.Code+"</th>";
+                    });
+                    BulkShareTable += "</tr></thead><tbody><tr>";
+                    BulkShareTable += "<td><i id=\"Bulk_SH\" class=\"material-icons\" title=\"No Change\" style=\"font-size:21px; padding-right:0px; color:grey\" onclick=\"fn_BulkShareClick('SH');\">radio_button_checked</i></td>";
+                    BulkShareTable += "<td><i id=\"Bulk_EI\" class=\"material-icons\" title=\"No Change\" style=\"font-size:21px; padding-right:0px; color:grey\" onclick=\"fn_BulkShareClick('EI');\">radio_button_checked</i></td>";
+                    BulkShareTable += "<td><i id=\"Bulk_VI\" class=\"material-icons\" title=\"No Change\" style=\"font-size:21px; padding-right:0px; color:grey\" onclick=\"fn_BulkShareClick('VI');\">radio_button_checked</i></td>";
+                    BulkShareTable += "<td><i id=\"Bulk_SG\" class=\"material-icons\" title=\"No Change\" style=\"font-size:21px; padding-right:0px; color:grey\" onclick=\"fn_BulkShareClick('SG');\">radio_button_checked</i></td>";
+                    jQuery.each(result, function(index, item) {
+                        BulkShareTable += "<td><i id=\"Bulk_"+item.Code+"\" class=\"material-icons\" title=\"No Change\" style=\"font-size:21px; padding-right:0px; color:grey\" onclick=\"fn_BulkShareClick('"+item.Code+"');\">radio_button_checked</i></td>"
+                    });
+                    BulkShareTable += "</tr></tbody></table>";
+                    $("#BulkShareTableDiv").html(BulkShareTable);
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: opening 714 shares /" + thrownError);
+                }
+            });
+        }
+        function fn_CheckAllItems()
+        {
+            if ($("#AllItems").is(":checked"))
+                $(".AvailableCheckBox").prop('checked', true);
+            else
+                $(".AvailableCheckBox").prop('checked', false);
+        }
+        function fn_BulkPricing()
+        {
+            if ($('#BulkDiv').is(":hidden"))
+            {
+                //if at least one checkbox is checked
+                $('#AvailableTable > tbody  > tr').each(function (index, element)
+                {
+                    var ListingID = $(this).closest('tr').attr('id').replace('ATTR_', '');
+                    if ($("#CheckBox_" + ListingID).is(":checked"))
+                    {
+                        fn_GetBulkShareTable();
+                        $("#ChangeDollars").prop('disabled', false);
+                        $("#ChangeDollars").val('');
+                        $("#ChangePercent").prop('disabled', false);
+                        $("#ChangePercent").val('');
+                        $("#BulkHold").val('No Change');
+                        $("#AddToNotes").val('');
+                        $("#BulkDiv").css('display', 'block');
+                        setTimeout(function () {
+                            $("#ChangeDollars").focus();
+                        }, 250);
+                        return false;
+                    }
+                });
+                if ($("#BulkDiv").css('display') != 'block')
+                alert("you must have at least one item selected.");
+            }
+            else
+                $("#BulkDiv").css('display', 'none');
+        }
+        function fn_AutoPrice() {
+            $('#AvailableTable tr').each(function (i, row) {
+                var $actualrow = $(row);
+                $checkbox = $actualrow.find('input:checked');
+                console.log($checkbox);
+            });
+        }
+        function fn_ReloadRemote() {
+            if (SH_Event_ID == 0)
+            {
+                var r = confirm('This event is currently unmatched.  Would you like to match this event?');
+                if (r == true)
+                {
+                    var URL = "GetEventSearch"
+                    $.ajax({
+                        type: 'POST',
+                        url: URL,
+                        data: {
+                            Event_ID: Event_ID,
+                            EventName: vEventName,
+                            CityState: vVenueCity
+                        },
+                        success: function (result) {
+                            jQuery.each(result, function(index, item) {
+                                $("#MatchTable > tbody").append("<tr onclick=fn_PickEvent("+item.id+"); ><td id='name_"+item.id+"' >"+item.name+"</td><td><input type='hidden' id='date_"+item.id+"' value='"+item.eventDateLocal+"' />"+ parseJsonDate(item.eventDateLocal)+"</td><td>"+item.venue.name+"</td></tr>");
+                            });
+                            $('#EventMatchDiv').modal('show');
+                            var MatchTable = $('#MatchTable').DataTable({
+                                "destroy": true,
+                                "autoWidth": true,
+                                "ordering": true,
+                                "scrollY": '40vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false
+                            });
+                            setTimeout(function () {
+                                MatchTable.draw();
+                            }, 250);
+                            $('#StubHubDiv').show();
+                            if (filterid == 0)
+                                filter = '';
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            alert("Error: search event on Stubhub /" + thrownError);
+                        }
+                    });
+                }
+            } else {
+                var URL = "../Inventory/GetStubhubData?eventId=" + SH_Event_ID + "&Filter=&FilterID=";
+                $.ajax({
+                    type: "GET",
+                    cache: false,
+                    aysnc: true,
+                    url: URL,
+                    success: function (result) {
+                        if (result.indexOf("fault") > 0)
+                        {
+                            $('#myPleaseWait').modal('hide');
+                            alert(result);
+                        } else {
+                            RemoteResult = result;
+                            fn_ResetSuggested();
+                            fn_StubhubDraw();
+                        }
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Getting Stubhub data /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_RecalcPhase2(Listing_ID, SectionName, ZoneName) {
+            var SuggestedPrice = 0;
+            if(MatchType == 'Section') {
+                $.each(RemoteResult, function (key, value) {
+                    if (value.sectionName == SectionName && value.Local == false)
+                    {
+                        SuggestedPrice = value.listingPrice.amount;
+                        return false;
+                    }
+                });
+            }
+            if(MatchType == 'Zone') {
+                $.each(RemoteResult, function (key, value) {
+                    if (value.zoneName == ZoneName && value.Local == false)
+                    {
+                        SuggestedPrice = value.listingPrice.amount;
+                        return false;
+                    }
+                });
+            }
+            if (SuggestedPrice > 0) {
+                var CurPrice = $("#Price_" + Listing_ID).val().replace('$', '').replace(',', '');
+                var NewColor = 'Red';
+                var NewPrice = 'XXXXX';
+
+                if (SuggestedPrice == CurPrice)
+                    NewPrice = "Good";
+                else
+                    NewPrice = formatCurrency(SuggestedPrice);
+
+                if (parseFloat(SuggestedPrice) >= parseFloat(CurPrice))
+                    NewColor = 'Green';
+
+                $('#Suggested_' + Listing_ID).text(NewPrice);
+                $('#Suggested_' + Listing_ID).css("color", NewColor);
+            }
+        }
+        function fn_RecalcSuggested() {
+            $.each(RemoteResult, function (key, value) {
+                if (value.Local == true)
+                {
+                    if (value.Listing_ID > 0)
+                        fn_RecalcPhase2(value.Listing_ID, value.sectionName, value.zoneName);
+                }
+            });
+        }
+        function fn_AvailableReload(){
+            //$("#myPleaseWait").modal('show');
+            AvailableTable = $("#AvailableTable").DataTable().destroy();
+            $("#AvailableTable > tbody").empty();
+            var URL = 'LoadAvailable?Event_ID=' + Event_ID + '&PO_ID=' + PO_ID;
+            $.ajax({
+                url: URL,
+                async: false,
+                contentType: 'application/html; charset=utf-8',
+                type: 'GET',
+                dataType: 'html',
+                success: function (result) {
+                    $("#AvailableTable > tbody").html(result);
+                    AvailableTable = $('#AvailableTable').DataTable({
+                        "ordering": true,
+                        "scrollY": '40vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "autowidth": false,
+                        "columnDefs": [
+                            { targets: [20,21,22,23], visible: false },
+                            { targets: [0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], orderable: false },
+                            { targets: [6], iDataSort: 20 },
+                            { targets: [1], iDataSort: 21},
+                            { targets: [2], iDataSort: 22}
+                        ],
+                        "order": [[1, "asc"]]
+                    });
+
+                    $("#AvailableTable tbody").on('click', 'tr', function(e) {
+                        idx = AvailableTable.row(this).index();
+                        var CurTableIndexs = AvailableTable.rows().indexes();
+                        var CurIndexArrayKey = CurTableIndexs.indexOf( idx );
+                        var NextItemIndex = CurTableIndexs[ CurIndexArrayKey + 1];
+                        NextID = AvailableTable.row(NextItemIndex).id().replace('ATTR_', '');
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Loading Available Inventory /" + thrownError);
+                }
+            });
+
+            $("#myPleaseWait").modal('hide');
+            fn_RecalcSuggested();
+        }
+        function fn_DoSplit(){
+            QtyToSplit = $("#SplitDD").val();
+            var URL = "SplitSeats";
+            $.ajax({
+                type: 'POST',
+                async: false,
+                url: URL,
+                data: {
+                    Login_ID: vLogin_ID,
+                    Listing_ID: vListing_ID,
+                    QtyToSplit: QtyToSplit
+                },
+                success: function (result) {
+                    fn_AvailableReload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Splitting Tickets /" + thrownError);
+                }
+            });
+        }
+        function fn_Split(Listing_ID, Qty, MinItem_ID) {
+            vListing_ID = Listing_ID;
+            var Color = $("#R_Notes_"+MinItem_ID).css("color");
+            OldColor = $("#ATTR_"+vListing_ID).css('background-color');
+            if(OldColor == "rgba(53, 53, 53, 0.04)")
+                OldColor = "";;
+            setTimeout(function () {
+                if(Color == "rgb(197, 197, 197)")//not held
+                {
+                    $("#ATTR_"+vListing_ID).css("background-color", "pink");
+                    $("#SplitDD").empty();
+                    for(var i=1; i<Qty; i++){
+                        $("#SplitDD").append(new Option(i, i));
+                    }
+                    $("#SplitDiv").modal('show');
+                } else {
+                    alert("Sorry, you can not split a held item.");
+                    $("#ATTR_"+vListing_ID).css("background-color", "");
+                }
+            }, 250);
+        }
+        function fn_PlaceHold() {
+            var HoldTickets = $("#HoldDD").val();
+            var HoldTime = $('input[name=HoldTime]:checked').val();
+            var HoldNotes = $("#HoldNotes").val();
+            var URL = "HoldSeats?Listing_ID=" + vListing_ID;
+            $.ajax({
+                type: 'POST',
+                async: false,
+                url: URL,
+                data: {
+                    Login_ID: vLogin_ID,
+                    HoldTickets: HoldTickets,
+                    HoldTime: HoldTime,
+                    HoldNotes: HoldNotes
+                },
+                success: function (result) {
+                    fn_AvailableReload();
+                    alert(result);
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Putting Tickets on Hold /" + thrownError);
+                }
+            });
+            $('#ATTR_'+vListing_ID).css('background-color', OldColor);
+        }
+        function fn_Reserve(Listing_ID, Qty, Transaction_ID){
+            vListing_ID = Listing_ID;
+            OldColor = $("#ATTR_"+vListing_ID).css('background-color');
+            setTimeout(function () {
+                if(Transaction_ID == 0)//not held
+                {
+                    $("#ATTR_"+vListing_ID).css("background-color", "pink");
+                    $("#HoldDD").empty();
+                    for(var i=Qty; i>0;i--){
+                        $("#HoldDD").append(new Option(i, i));
+                    }
+                    $("#HoldNotes").val('');
+                    $("#HoldDiv").modal('show');
+                    setTimeout(function() {
+                        $("#HoldNotes").focus();
+                    }, 500);
+                } else {
+                    var Message = $("#R_Notes_"+Transaction_ID).attr('title');
+                    var answer = confirm('RELEASE HOLD, ARE YOU SURE?\n\n' + Message);
+                    if (answer) {
+                        var URL = "ReleaseHold?Transaction_ID=" + Transaction_ID;
+                        $.ajax({
+                            type: 'POST',
+                            async: false,
+                            url: URL,
+                            success: function (result) {
+                                fn_AvailableReload();
+                            },
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                alert("Error: Removing Hold /" + thrownError);
+                            }
+                        });
+                    }
+                    $('#ATTR_'+vListing_ID).css('background-color', OldColor);
+                }
+            }, 250);
+        }
+        function fn_FillPresale(Listing_ID) {
+            $('#myPleaseWait').modal('show');
+            if (PresaleID > 0) {
+                var URL = "FillPPO?PresaleID=" + PresaleID + "&ListingID=" + Listing_ID;
+                $.ajax({
+                    url: URL,
+                    success: function (result) {
+                        if (result == 'Success') {
+                            location.reload();
+                        } else {
+                            alert(result);
+                            $('#myPleaseWait').modal('hide');
+                            setTimeout(function () {
+                                $("#Sel_" + Listing_ID).prop('checked', false);
+                            }, 250);
+                        }
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert("Error: Filling PPO /" + thrownError);
+                        $('#myPleaseWait').modal('hide');
+                    }
+                });
+            }
+        }
+        function fn_PresaleClick(Item_ID) {
+            if($("#CB_" + Item_ID).is(":checked") == true) {
+                $(".PresalesTD").css('background-color', 'grey');
+                $("#TD1_" + Item_ID).css('background-color', '');
+                $("#TD2_" + Item_ID).css('background-color', '');
+                $("#TD3_" + Item_ID).css('background-color', '');
+                $("#TD4_" + Item_ID).css('background-color', '');
+                $("#TD5_" + Item_ID).css('background-color', '');
+                $("#TD7_" + Item_ID).css('background-color', '');
+                $(".PresalesCheck").prop("disabled", true);
+                $("#CB_" + Item_ID).prop("disabled", false);
+                $(".CheckBox").prop('checked', false);
+                PresaleID = Item_ID;
+            } else {
+                $(".PresalesTD").css('background-color', '');
+                $(".PresalesCheck").prop("disabled", false);
+                PresaleID = 0;
+            }
+        }
+        function parseJsonDate(jsonDateString){
+            return new Date(parseInt(jsonDateString.replace('/Date(', '')));
+        }
+        function fn_SelectValue(Source, Listing_ID){
+            OldValue = $("#Price_"+Listing_ID).val().replace('$', '').replace(',', '');
+            OldSHValue = $("#SHPrice_"+Listing_ID).val().replace('$', '').replace(',', '');
+            $("#"+Source+"_"+Listing_ID).select();
+        }
+        function fn_Close714() {
+            $("#"+vListing_ID).css('background-color', 'white');
+        }
+        function fn_Open714(Listing_ID) {
+            $("#714Table tbody").empty();
+            Url = "/Inventory/Get714Shares?ListingID=" + Listing_ID;
+            $.ajax({
+                async:false,
+                url: Url,
+                success: function (result) {
+                    $("#"+Listing_ID).css('background-color', 'pink');
+                    jQuery.each(result, function(index, item) {
+                        $("#714Table > tbody").append("<tr><th>"+item.Code+"</th><th>"+item.Name+"</th><th><i id=\""+item.Code+"_"+Listing_ID+"\" class=\"material-icons\" style=\"font-size:21px; padding-right:0px; color:"+item.Status+"\" onclick=\"fn_ShareClick('"+item.Code+"', "+Listing_ID+");\">radio_button_checked</i></th></tr>");
+                    });
+                    $('#myPleaseWait').modal('hide');
+                    $("#714Div").modal('show');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: opening 714 shares /" + thrownError);
+                }
+            });
+        }
+        function fn_ShareClick(Source, Listing_ID) {
+            vListing_ID = Listing_ID;
+            var Current = $("#"+Source+"_"+Listing_ID).css('color');
+            if (Source == 'All')
+            {
+                if(Current == "rgb(0, 128, 0)") { //Red
+                    Url = "/Inventory/AllGoGreen?ListingID=" + vListing_ID;
+                    var NewColor="rgb(255, 0, 0)";
+                } else {
+                    Url = "/Inventory/AllGoRed?ListingID=" + vListing_ID;
+                    var NewColor="rgb(0, 128, 0)";
+                }
+                $.ajax({
+                    type: 'POST',
+                    url: Url,
+                    data: {
+                        Login_ID: vLogin_ID
+                    },
+                    success: function (result) {
+                        if ( $("#SH_"+Listing_ID).css('color') == 'rgb(128, 128, 128)')
+                        {
+                            //alert('grey');
+                        } else {
+                            $("#SH_"+vListing_ID).css('color', Current);
+                        }
+                        //$("#TC_"+vListing_ID).css('color', Current);
+                        $("#EI_"+vListing_ID).css('color', Current);
+                        $("#VI_"+vListing_ID).css('color', Current);
+                        $("#SG_"+vListing_ID).css('color', Current);
+                        $("#714_"+vListing_ID).css('color', Current);
+                        $("#All_"+vListing_ID).css('color', NewColor);
+                        $("#myPleaseWait").modal('hide');
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $("#myPleseWait").modal('hide');
+                        alert("Error: update All Icons /" + thrownError);
+                    }
+                });
+            } else if (Source == '714') {
+                if (Current == "rgb(255, 0, 0)") {
+                    Url = "/Inventory/Green714?ListingID=" + Listing_ID;
+                    $.ajax({
+                        type: 'POST',
+                        url: Url,
+                        data: {
+                            Login_ID: vLogin_ID
+                        },
+                        async:false,
+                        success: function (result) {
+                            $("#714_"+Listing_ID).css("color", "green");
+                            fn_Open714(Listing_ID);
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: update 714 /" + thrownError);
+                        }
+                    });
+                } else {
+                    fn_Open714(Listing_ID);
+                }
+            } else {
+                var URL = "../Inventory/UpdateShare?Listing_ID=" + Listing_ID;
+                $.ajax({
+                    type: 'POST',
+                    data: {
+                        Source: Source,
+                        Current: Current,
+                        Login_ID: vLogin_ID
+                    },
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        jQuery.each(result, function(index, item) {
+                            $("#"+Source+"_"+Listing_ID).css('color', item.ReturnColor);
+                            if (item.ReturnString != '')
+                                alert(item.Message);
+                            else {
+                                if($("#714Div").is(":visible"))
+                                    $("#714_"+Listing_ID).css('color', item.Return714);
+                            }
+                        });
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Updating Share /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_ChangePrice2(Listing_ID, NewValue, RemoteTitle)
+        {
+            var URL = "../Inventory/UpdatePrice?Listing_ID=" + Listing_ID;
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Current: NewValue,
+                    Title: RemoteTitle,
+                    Login_ID: vLogin_ID
+                },
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    jQuery.each(result, function(index, item) {
+                        if (item.ReturnString == "")
+                        {
+                            $("#SHPrice_"+Listing_ID).val(formatCurrency(NewValue * SHMarkup));
+                            $("#SHPrice_"+Listing_ID).css("color", "red");
+                            $("#Price_"+Listing_ID).val(formatCurrency(NewValue));
+                            $("#Price_"+Listing_ID).css('background-color', 'lightblue');
+                            $('#Price_'+NextID).focus();
+                            $('#Price_'+NextID).trigger('click');
+                            return false;
+                        } else {
+                            $("#Price_"+Listing_ID).val(formatCurrency(OldValue));
+                            alert(item.ReturnString);
+                        }
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Updating Price /" + thrownError);
+                }
+            });
+        }
+        function fn_ChangSHPrice2(Listing_ID, NewSHValue)
+        {
+            var URL = "../Inventory/UpdateSHPrice?Listing_ID=" + Listing_ID;
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Current: NewSHValue,
+                    Login_ID: vLogin_ID
+                },
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    jQuery.each(result, function(index, item) {
+                        if (item.ReturnString == "")
+                        {
+                            $("#SHPrice_"+Listing_ID).val(formatCurrency(NewSHValue));
+                            $("#SHPrice_"+Listing_ID).css('background-color', 'lightblue');
+                            $("#Price_"+Listing_ID).val(formatCurrency(item.LocalPrice));
+                            $("#SHPrice_"+NextID).focus();
+                            $('#SHPrice_'+NextID).trigger('click');
+                        } else {
+                            $("#SHPrice_"+Listing_ID).val(formatCurrency(OldSHValue));
+                            alert(item.ReturnString);
+                        }
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    //$('#myPleaseWait').modal('hide');
+                    alert("Error: Updating SHPrice /" + thrownError);
+                }
+            });
+        }
+        function fn_ChangePrice(Listing_ID) {
+            var NewValue = $("#Price_" + Listing_ID).val().replace('$', '').replace(',', '');
+            var RemoteTitle = $("#RemoteTitle").text();
+            var finishit = false;
+
+            if (parseFloat(OldValue) > 1500) { //15%
+                if (parseFloat(NewValue) < OldValue *.85) {
+                    var answer = confirm('Change price from ' + formatCurrency(OldValue) + ' to $' + fomratCurrency(NewValue) + '! Are you sure?');
+                    if (answer) {
+                        finishit = true;
+                    } else { // revert to original price
+                        $("#Price_" + Listing_ID).val(formatCurrency(OldValue));
+                        $("#Price_" + Listing_ID).select();
+                    }
+                } else {
+                    finishit = true;
+                }
+            } else {
+                if (parseFloat(OldValue) > 50) { //35%
+                    if (parseFloat(NewValue) < OldValue * .65) {
+                        var answer = confirm('Change price from ' + formatCurrency(OldValue) + ' to $' + formatCurrency(NewValue) + '! Are you sure?');
+                        if (answer) {
+                            finishit = true;
+                        } else { // revert to original price
+                            $("#Price_" + Listing_ID).val(formatCurrency(OldValue));
+                            $("#Price_" + Listing_ID).select();
+                        }
+                    } else {
+                        finishit = true;
+                    }
+                } else {
+                    finishit = true;
+                }
+            }
+            if (finishit) {
+                fn_ChangePrice2(Listing_ID, NewValue, RemoteTitle);
+            }
+        }
+        function fn_ChangeSHPrice(Listing_ID) {
+            var NewSHValue = $("#SHPrice_" + Listing_ID).val().replace('$', '').replace(',', '');
+            var finishit = false;
+            if (parseFloat(OldSHValue) > 1500) { //15%
+                if (parseFloat(NewSHValue) < OldSHValue *.85) {
+                    var answer = confirm('Change SH price from ' + formatCurrency(OldSHValue) + ' to ' + formatCurrency(NewSHValue) + '! Are you sure?');
+                    if (answer) {
+                        finishit = true;
+                    } else { // revert to original price
+                        $("#SHPrice_" + Listing_ID).val(formatCurrency(OldSHValue));
+                        $("#SHPrice_" + Listing_ID).select();
+                    }
+                } else {
+                    finishit = true;
+                }
+            } else {
+                if (parseFloat(OldSHValue) > 50) { //35%
+                    if (parseFloat(NewSHValue) < OldSHValue * .65) {
+                        var answer = confirm('Change SH price from ' + formatCurrency(OldSHValue) + ' to ' + formatCurrency(NewSHValue) + '! Are you sure?');
+                        if (answer) {
+                            finishit = true;
+                        } else { // revert to original price
+                            $("#SHPrice_" + Listing_ID).val(formatCurrency(OldSHValue));
+                            $("#SHPrice_" + Listing_ID).select();
+                        }
+                    } else {
+                        finishit = true;
+                    }
+                } else {
+                    finishit = true;
+                }
+            }
+            if (finishit) {
+                fn_ChangeSHPrice2(Listing_ID, NewSHValue);
+            }
+        }
+        function fn_Suggested(Listing_ID) {
+            var Suggested  = $("#Suggested_"+Listing_ID).text().replace("$", "").replace(",", "").trim();
+            $("#Price_"+Listing_ID).val(Suggested);
+            fn_ChangePrice(Listing_ID);
+        }
+        function fn_UpdateDetails(Source) {
+            $('#myPleaseWait').modal('show');
+            var NewData;
+            if (Source == 'Section')
+                NewData = $("#dSection").val();
+            if (Source == 'Row')
+                NewData = $("#dRow").val();
+            if (Source == 'Face')
+                NewData = $("#dFace").val();
+            if (Source == 'Internal')
+                NewData = $("#dInternalNotes").val();
+            if (Source == 'External')
+                NewData = $("#dExternalNotes").val();
+            if (Source == 'SHBlock')
+            {
+                if ($("#dSH").is(':checked'))
+                    NewData = 1;
+                else
+                    NewData = 0;
+            }
+            var URL = "../Inventory/UpdateDetail?Listing_ID=" + vListing_ID;
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Source: Source,
+                    NewData: NewData,
+                    Login_ID: vLogin_ID
+                },
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    if (Source == 'SHBlock')
+                    {
+                        if (NewData == 1)
+                            $("#SH_" + vListing_ID).css('color', 'grey');
+                        else
+                            $("#SH_" + vListing_ID).css('color', 'red');
+                    }
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Details /" + thrownError);
+                }
+            });
+        }
+        function fn_GetDetails(Listing_ID) {
+            vListing_ID = Listing_ID;
+            $("#DetailTable tbody").empty();
+            var URL = "/Inventory/GetItemDetails?Listing_ID=" + Listing_ID;
+            $.ajax({
+                url: URL,
+                async: true,
+                success: function (result) {
+                    var LoopCount = 1;
+                    var Section;
+                    var Row;
+                    var MinFace = 999999;
+                    var MaxFace = 0;
+                    var Cost;
+                    var Price;
+                    var Minseat = 9999;
+                    var Maxseat = 0;
+                    var Internal;
+                    var External;
+                    var InHand;
+                    var InHandDate;
+                    var OnWeb;
+                    var eDelivery;
+                    var Barcode = 0;
+                    var PDF = 0;
+                    var SH = 0;
+                    var cSection=true;
+                    var cRow = true;
+                    var cFace = true;
+                    var cCost = true;
+                    var cPrice = true;
+                    var cInternal = true;
+                    var cExternal = true;
+                    var cInHand = true;
+                    var cInHandDate = true;
+                    var cOnWeb = true;
+                    var ceDelivery = true;
+                    var cBarcode = true;
+                    var cPDF = true;
+                    var cSH = true;
+                    var TicketList = '';
+                    var TicketList2 = '';
+                    var TicketList3 = '';
+                    var TicketList4 = '';
+                    var TicketList5 = '';
+                    var TicketList6 = '';
+                    $.each(result, function (key, value) {
+                        TicketList += '\nSec:'+value.Section+'  Row:'+value.Row+'  Seat:'+value.Seat_Number+'  Face:'+formatCurrency(value.Face)+'  Cost:'+formatCurrency(value.Item_Cost)+'  Price:'+formatCurrency(value.Item_Price);
+                        TicketList2 += '\nSec:'+value.Section+'  Row:'+value.Row+'  Seat:'+value.Seat_Number+'  InHand:'+value.InHand+'  InHandDate:'+value.InHandDate+'  OnWeb:'+value.OnWeb;
+                        TicketList3 += '\nSec:'+value.Section+'  Row:'+value.Row+'  Seat:'+value.Seat_Number+'  eDelivery:'+value.eDelivery+'  Barcode:'+value.Barcode+'  PDF:'+value.PDF_FileName;
+                        TicketList4 += '\nSec:'+value.Section+'  Row:'+value.Row+'  Seat:'+value.Seat_Number+'  Internal:'+value.Internal_Notes;
+                        TicketList5 += '\nSec:'+value.Section+'  Row:'+value.Row+'  Seat:'+value.Seat_Number+'  External:'+value.External_Notes;
+                        TicketList6 += '\nSec:'+value.Section+'  Row:'+value.Row+'  Seat:'+value.Seat_Number+'  SH Block:'+value.SH;
+                        if (parseInt(value.Seat_Number) < parseInt(Minseat))
+                            Minseat = value.Seat_Number;
+                        if (parseInt(value.Seat_Number) > parseInt(Maxseat))
+                            Maxseat = value.Seat_Number;
+                        if (parseFloat(value.Face) < parseFloat(MinFace))
+                            MinFace = value.Face;
+                        if (parseFloat(value.Face) > parseFloat(MaxFace))
+                            MaxFace = value.Face;
+
+                        if (LoopCount == 1)
+                        {
+                            Section = value.Section;
+                            Row = value.Row;
+                            Face = value.Face;
+                            Cost = value.Item_Cost;
+                            Price = value.Item_Price;
+                            Internal = value.Internal_Notes;
+                            External = value.External_Notes;
+                            InHand = value.InHand;
+                            InHandDate = value.InHandDate;
+                            OnWeb = value.OnWeb;
+                            eDelivery = value.eDelivery;
+                            if(value.Barcode.length > 0)
+                                Barcode = 1;
+                            if(value.PDF_FileName.length > 0)
+                                PDF = 1;
+                            SH = value.SH;
+                        } else {
+                            if (value.Section != Section)
+                                cSection = false;
+                            if (value.Row != Row)
+                                cRow = false;
+                            if (value.Face != Face)
+                                cFace = false;
+                            if (value.Item_Cost != Cost)
+                                cCost = false;
+                            if (value.Item_Price != Price)
+                                cPrice = false;
+                            if (value.Internal_Notes != Internal)
+                                cInternal = false;
+                            if (value.External_Notes != External)
+                                cExternal = false;
+                            if (value.InHand != InHand)
+                                cInHand = false;
+                            if (value.InHandDate != InHandDate)
+                                cInHandDate = false;
+                            if (value.OnWeb != OnWeb)
+                                cOnWeb = false;
+                            if (value.eDelivery != eDelivery)
+                                ceDelivery = false;
+                            if(value.Barcode.length > 0 && Barcode == 0)
+                                cBarcode = false;
+                            else {
+                                if(value.Barcode.length == 0 && Barcode == 1)
+                                    cBarcode = false;
+                            }
+                            if(value.PDF_FileName.length > 0 && PDF.length == 0)
+                                cPDF = false;
+                            else {
+                                if(value.PDF_FileName.length == 0 && PDF.lenght == 0)
+                                    cPDF = false;
+                            }
+                            if (value.SH != SH)
+                                cSH = false;
+                        }
+                        LoopCount += 1;
+                    })
+                    if (cSection)
+                        $("#DetailTable > tbody").append( "<tr><th>Section</th><td><input id='dSection' style='max-width:80px; text-align:center; background-color:lightblue;' value='"+Section+"' onclick='this.select();' onchange='fn_UpdateDetails(\"Section\");' /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>Section</th><td><input id='dSection' style='max-width:80px; text-align:center; background-color:pink;' value='"+Section+"' title='"+TicketList+"' disabled /></td></tr>");
+                    if (cRow)
+                        $("#DetailTable > tbody").append( "<tr><th>Row</th><td><input id='dRow' style='max-width:80px; text-align:center; background-color:lightblue;' value='"+Row+"' onclick='this.select();' onchange='fn_UpdateDetails(\"Row\");' /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>Row</th><td><input id='dRow' style='max-width:80px; text-align:center; background-color:pink;' value='"+Row+"' title='"+TicketList+"' /></td></tr>");
+
+                    if(LoopCount == 1)
+                        $("#DetailTable > tbody").append( "<tr><th>Seats</th><td><input style='max-width:80px; text-align:center;' value='"+Minseat+"' disabled /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>Seats</th><td><input style='max-width:80px; text-align:center;' title='"+TicketList+"'value='"+Minseat+"-"+Maxseat+"' disabled /></td></tr>");
+                    $("#DetailTable > tbody").append( "<tr><th>Qty</th><td><input style='max-width:80px; text-align:center;' value='"+LoopCount+"' disabled /></td></tr>");
+                    if (cFace)
+                        $("#DetailTable > tbody").append( "<tr><th>Face</th><td><input id='dFace' style='max-width:80px; background-color:lightblue; text-align:right;' value='"+formatCurrency(Face)+"' onclick='this.select();' onchange='fn_UpdateDetails(\"Face\");' /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>Face</th><td><input id='dFace' style='max-width:80px; background-color:pink; text-align:right;' value='"+formatCurrency(Face)+"' title='"+TicketList+"' disabled /></td></tr>");
+                    if (cCost)
+                        $("#DetailTable > tbody").append( "<tr><th>Cost</th><td><input style='max-width:80px; text-align:right;' value='"+formatCurrency(Cost)+"' disabled /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>Cost</th><td><input style='max-width:80px; background-color:pink; text-align:right;' value='"+formatCurrency(Cost)+"' title='"+TicketList+"' disabled /></td></tr>");
+                    if (cPrice)
+                        $("#DetailTable > tbody").append( "<tr><th>Price</th><td><input style='max-width:80px; text-align:right;' value='"+formatCurrency(Price)+"' disabled /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>Price</th><td><input style='max-width:80px; background-color:pink; text-align:right;' value='"+formatCurrency(Price)+"' title='"+TicketList+"' disabled /></td></tr>");
+                    if (cInHand)
+                        $("#DetailTable > tbody").append( "<tr><th>InHand</th><td><input type='checkbox' id='dInHand' disabled /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>InHand</th><td><input type='checkbox' id='dInHand' disabled /><a href='#' title='"+TicketList2+"'>Inconsistant</a></td></tr>");
+                    if (InHand)
+                        $("#dInHand").attr('checked', true);
+                    if (cInHandDate)
+                        $("#DetailTable > tbody").append( "<tr><th>InHand Date</th><td><input style='max-width:80px; text-align:center;' value='"+InHandDate+"' disabled /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>InHand Date</th><td><input style='max-width:80px; background-color:pink; text-align:center;' value='"+InHandDate+"' title='"+TicketList2+"' disabled /></td></tr>");
+                    if (cOnWeb)
+                        $("#DetailTable > tbody").append( "<tr><th>OnWeb</th><td><input type='checkbox' id='dOnWeb' disabled /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>OnWeb</th><td><input type='checkbox' id='dOnWeb' disabled /></td></tr>");
+                    if (OnWeb)
+                        $("#dOnWeb").attr('checked', true);
+                    if (ceDelivery)
+                        $("#DetailTable > tbody").append( "<tr><th>eDelivery</th><td><input type='checkbox' id='deDelivery' disabled /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>eDelivery</th><td><input type='checkbox' id='deDelivery' disabled /><a href='#' title='"+TicketList3+"'>Inconsistant</a></td></tr>");
+                    if (eDelivery)
+                        $("#deDelivery").attr('checked', true);
+                    if (cBarcode)
+                        $("#DetailTable > tbody").append( "<tr><th>Barcode</th><td><input type='checkbox' id='dBarcode' disabled /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>Barcode</th><td><input type='checkbox' id='dBarcode' disabled /><a href='#' title='"+TicketList3+"'>Inconsistant</a></td></tr>");
+                    if (Barcode == 1)
+                        $("#dBarcode").attr('checked', true);
+                    if (cPDF)
+                        $("#DetailTable > tbody").append( "<tr><th>PDF</th><td><input type='checkbox' id='dPDF' disabled /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>PDF</th><td><input type='checkbox' id='dPDF' disabled /><a href='#' title='"+TicketList3+"'>Inconsistant</a></td></tr>");
+                    if (PDF == 1)
+                        $("#dPDF").attr('checked', true);
+                    if (cSH == 1)
+                        $("#DetailTable > tbody").append( "<tr><th>SH Block</th><td><input type='checkbox' id='dSH' onchange='fn_UpdateDetails(\"SHBlock\");' /></td></tr>");
+                    else
+                        $("#DetailTable > tbody").append( "<tr><th>SH Block</th><td><input type='checkbox' id='dSH' disabled /><a href='#' title='"+TicketList6 +"'>Inconsistant</a></td></tr>");
+                    if (SH == 1)
+                        $("#dSH").attr('checked', true);
+                    $("#dInternalNotes").text(Internal)
+                    if (!cInternal)
+                    {
+                        $('#dInternalNotes').attr('title', TicketList4);
+                        $("#dInternalNotes").css('background-color', 'pink');
+                        $("#dInternalNotes").attr("disabled", "disabled");
+                    }
+                    $("#dExternalNotes").text(External)
+                    if (!cExternal)
+                    {
+                        $('#dExternalNotes').attr('title', TicketList5);
+                        $("#dExternalNotes").css('background-color', 'pink');
+                        $("#dExternalNotes").attr("disabled", "disabled");
+                    }
+                    $("#DetailTableDiv").modal('show');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Get item details /" + thrownError);
+                }
+            });
+        }
+        function fn_DisplayPage(Type){
+            $(".DisplayIcon").css('color', '#959595');
+            $(".DisplayText").css('color', '#959595');
+            $("#Display" + Type + "Icon").css('color', '#353535');
+            $("#Display" + Type + "Text").css('color', '#353535');
+            $(".MainDiv").hide();
+            $("#" + Type + "Div").show();
+            if (Type == 'AutoPrice')
+            {
+                $("#UserList").val(vLogin_ID);
+            }
+            if (Type == 'Activity')
+            {
+                $('#myPleaseWait').modal('show');
+                setTimeout(function () {
+                    var URL = "../Inventory/GetActivityList?Event_ID=" + Event_ID;
+                    setTimeout(function () {
+                        $.ajax({
+                            type: "GET",
+                            cache: false,
+                            aysnc: false,
+                            url: URL,
+                            success: function (result) {
+                                var ActivityTable = $("#ActivityTable").DataTable().destroy();
+                                $("#ActivityTable tbody").empty();
+                                $.each(result, function (key, value) {
+                                    var NewRec = "<tr><td>" + value.Message + "</td><td>" + value.User + "</td><td>" + value.Created + "</td><td>" + value.SortDate + "</td></tr>";
+                                    $("#ActivityTable > tbody").append(NewRec);
+                                })
+                                var ActivityTable = $('#ActivityTable').DataTable({
+                                    "destroy": true,
+                                    "autoWidth": true,
+                                    "ordering": true,
+                                    "scrollY": '40vh',
+                                    "scrollCollapse": true,
+                                    "paging": false,
+                                    "searching": true,
+                                    "info": false,
+                                    "columnDefs": [
+                                       { targets: [3], visible: false },
+                                       { targets: [2], iDataSort: 3 }
+                                    ],
+                                    "order": [[ 2, "desc" ]]
+                                });
+                                setTimeout(function () {
+                                    ActivityTable.draw();
+                                }, 250);
+                                $('#myPleaseWait').modal('hide');
+                            },
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                $('#myPleaseWait').modal('hide');
+                                alert("Error: Getting Activity List /" + thrownError);
+                            }
+                        });
+                    }, 250);
+                }, 250);
+            }
+        }
+        function fn_ResetFilter(){
+            $("#CancelIcon").hide();
+            $("#SecList").val(0);
+            $("#ZoneList").val(0);
+            $("#TicketQty").val(0);
+            AvailableTable.columns(1).search ("");
+            AvailableTable.columns(4).search ("");
+            AvailableTable.columns(23).search ("").draw();
+            StubhubTable.columns(0).search ("");
+            StubhubTable.columns(1).search ("");
+            StubhubTable.columns(3).search ("").draw();
+            fn_RecalcSuggested();
+            fn_RecalcTotals();
+            if ($("#DisplayList :selected").text() == "Graph")
+                fn_UpdateGraph();
+        }
+        function fn_ChangeSectionZone(){
+            var current = $("#SectionZone").text();
+            if(current == "SECTION FILTER")
+            {
+                MatchType = "Zone";
+                $("#SectionZone").text("ZONE FILTER");
+                $("#SecDiv").hide();
+                $("#ZoneDiv").show();
+            }else{
+                MatchType = "Section";
+                $("#SectionZone").text("SECTION FILTER");
+                $("#ZoneDiv").hide();
+                $("#SecDiv").show();
+            }
+            fn_ResetFilter();
+        }
+        function fn_FixSeats(seatstring) {
+            if(seatstring==null || seatstring==undefined || seatstring=='') {
+                return '';
+            } else {
+                var array = seatstring.split(',');
+                if (array.length > 1) {
+                    var newstring = array[0] + '-' + array[array.length - 1]
+                    return newstring;
+                }
+                else {
+                    return seatstring;
+                }
+            }
+        }
+        function fn_StubhubDraw() {
+            var Qty = 0;
+            var Price = 0.00;
+            $.each(RemoteResult, function (key, value) {
+                Qty += value.quantity;
+                Price += (value.quantity * value.listingPrice.amount);
+            });
+            if(Qty > 0)
+            {
+                $("#SecFilter").css("display", "inline-block");
+            }
+            $("#SHAvailableQty").html(Qty);
+            $("#SHAvailablePrice").html(formatCurrency(Price));
+            StubhubTable = $("#StubhubTable").DataTable().destroy();
+            $("#StubhubTable tbody").empty();
+            var aSecList = [];
+            var aZoneList = [];
+            var SecTotals = [];
+            var ZoneTotals = [];
+            $.each(RemoteResult, function (key, value) {
+                var SectionElement = (value.sectionName.replace(value.zoneName, "").trim());
+                
+                var ZoneElement = value.zoneName
+                if (ZoneElement != null)
+                    ZoneElement = ZoneElement.trim();
+                
+                if(!isNaN(parseFloat(SectionElement)) && isFinite(SectionElement))
+                    SectionElement = ('000000000000000000000000000000'+SectionElement).slice(-30);
+                
+                if(aSecList.indexOf(SectionElement) == -1)
+                    aSecList.push(SectionElement);
+                if(aZoneList.indexOf(ZoneElement) == -1)
+                    aZoneList.push(ZoneElement);
+
+                $("#SHPrice_" + value.Listing_ID).val(formatCurrency(value.listingPrice.amount));
+                $("#SHPrice_" + value.Listing_ID).css("color", "green");
+
+                $("#StubhubTable > tbody").append( ((value.Local == true) ? "<tr class='TableTr' style='background-color:lightblue'><td>" : "<tr class='TableTr'><td style='margin-left:4px; border:none;'>")+
+                    value.zoneName + "</td><td style='padding-left:4px; border:none;'>"+
+                    value.sectionName.replace(value.zoneName, '')+"</td><td style='border:none;'>"+
+                    value.row+"</td><td style='text-align:center; border:none;'>"+
+                    value.quantity+"</td><td style='text-align:right; padding-right:4px; border:none; background-color:rgba(229,229,229, 0.48)';>"+
+                    formatCurrency(value.listingPrice.amount)+"</td></tr>");
+            })
+            var html = '';
+            html += '<option value=' + 0 + '>All Sections</option>';
+
+            aSecList.sort();
+            for (var s = 0, len = aSecList.length; s < len; s++){
+                html += '<option value=' + s + '>' + aSecList[s].replace(/^0+/, ''); + '</option>';
+            }
+            $("#SecList").append(html);
+            aSecList = null;
+            $("#SecList").show();
+ 
+            aZoneList.sort();
+            var html = '';
+            html += '<option value=' + 0 + '>All Zones</option>';
+            for (var s = 0, len = aZoneList.length; s < len; s++){
+                html += '<option value=' + s + '>' + aZoneList[s] + '</option>';
+            }
+            $("#ZoneList").append(html);
+            aZoneList = null;
+            $("#ZoneDiv").hide();
+
+            $('#myPleaseWait').modal('hide');
+            StubhubTable = $('#StubhubTable').DataTable({
+                "destroy": true,
+                "autoWidth": true,
+                "ordering": true,
+                "scrollY": '40vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "columnDefs": [
+                    { sClass: "TableTd", targets: [ 0,1,2,3,4 ]},
+                ],
+                "order": [[1, "asc"]]
+            });
+            $("#SecDiv").show();
+            $("#SecList").change( function() {
+                SecList = $("#SecList option:selected").text();
+            })
+            $("#StubhubDiv").show();
+            StubhubTable = $('#StubhubTable').DataTable();
+            setTimeout(function () {
+                StubhubTable.draw();
+            }, 250);
+            $('#myPleaseWait').modal('hide');
+            // Recalc suggested
+            setTimeout(function () {
+                fn_RecalcSuggested();
+            }, 250);
+          }
+        function fn_PickEvent(eventId){
+            var eventname = $("#name_"+eventId).text();
+            var eventdate = $("#date_"+eventId).val();
+            var r = confirm('Are you sure you want to record this event is ' + eventname + ' on ' + parseJsonDate(eventdate) + '?');
+            if (r == true)
+            {
+                var URL = "UpdateSHEvent?eventId=" + eventId;
+                $.ajax({
+                    type: 'POST',
+                    url: URL,
+                    data: {
+                        EventName: eventname,
+                        EventDate: eventdate,
+                        Event_ID: Event_ID
+                    },
+                    success: function (result) {
+                        $("#EventMatchDiv").modal('hide');
+                        SH_Event_ID = eventId;
+                        var URL = "../Inventory/GetStubhubData?eventId=" + SH_Event_ID + "&Filter=&FilterID=";
+                        $.ajax({
+                            type: "GET",
+                            cache: false,
+                            aysnc: true,
+                            url: URL,
+                            success: function (result) {
+                                if (result.indexOf("fault") > 0)
+                                {
+                                    $('#myPleaseWait').modal('hide');
+                                    alert(result);
+                                } else {
+                                    RemoteResult = result;
+                                    fn_ResetSuggested();
+                                    fn_StubhubDraw();
+                                }
+                            },
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                alert("Error: Getting Stubhub data /" + thrownError);
+                                $('#myPleaseWait').modal('hide');
+                            }
+                        });
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert("Error: updateing SHEvent table /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_ChangeSource() {
+            $('#myPleaseWait').modal('show');
+            if (SH_Event_ID == 0)
+            {
+                $('#myPleaseWait').modal('hide');
+                var r = confirm('This event is currently unmatched.  Would you like to match this event?');
+                if (r == true)
+                {
+                    var URL = "GetEventSearch"
+                    $.ajax({
+                        type: 'POST',
+                        url: URL,
+                        data: {
+                            Event_ID: Event_ID,
+                            EventName: vEventName,
+                            CityState: vVenueCity
+                        },
+                        success: function (result) {
+                            jQuery.each(result, function(index, item) {
+                                $("#MatchTable > tbody").append("<tr onclick=fn_PickEvent("+item.id+"); ><td id='name_"+item.id+"' >"+item.name+"</td><td><input type='hidden' id='date_"+item.id+"' value='"+item.eventDateLocal+"' />"+ parseJsonDate(item.eventDateLocal)+"</td><td>"+item.venue.name+"</td></tr>");
+                            });
+                            $('#EventMatchDiv').modal('show');
+                            var MatchTable = $('#MatchTable').DataTable({
+                                "destroy": true,
+                                "autoWidth": true,
+                                "ordering": true,
+                                "scrollY": '40vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false
+                            });
+                            setTimeout(function () {
+                                MatchTable.draw();
+                            }, 250);
+                            $('#StubHubDiv').show();
+                            if (filterid == 0)
+                                filter = '';
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            alert("Error: search event on Stubhub /" + thrownError);
+                        }
+                    });
+                }
+            } else {
+                var URL = "../Inventory/GetStubhubData?eventId=" + SH_Event_ID + "&Filter=&FilterID=";
+                $.ajax({
+                    type: "GET",
+                    cache: false,
+                    aysnc: true,
+                    url: URL,
+                    success: function (result) {
+                        if (result.indexOf("fault") > 0)
+                        {
+                            $('#myPleaseWait').modal('hide');
+                            alert(result);
+                        } else {
+                            RemoteResult = result;
+                            fn_ResetSuggested();
+                            fn_StubhubDraw();
+                        }
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Getting Stubhub data /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_ResetSuggested() {
+            var vListingID;
+            $('#AvailableTable tbody tr').each(function() {
+                vListingID = $(this).attr("id");
+                $('#Suggested_' + vListingID).css("color", "#959595");
+                $('#Suggested_' + vListingID).text('?????');
+            });
+        }
+        function PopupCenter(url, title, w, h) {
+            // Fixes dual-screen position                         Most browsers      Firefox
+            var dualScreenLeft = window.screenLeft != undefined ? window.screenLeft : screen.left;
+            var dualScreenTop = window.screenTop != undefined ? window.screenTop : screen.top;
+
+            var width = window.innerWidth ? window.innerWidth : document.documentElement.clientWidth ? document.documentElement.clientWidth : screen.width;
+            var height = window.innerHeight ? window.innerHeight : document.documentElement.clientHeight ? document.documentElement.clientHeight : screen.height;
+
+            var left = ((width / 2) - (w / 2)) + dualScreenLeft;
+            var top = ((height / 2) - (h / 2)) + dualScreenTop;
+            var newWindow = window.open(url, title, 'statusbar=0, scrollbars=0, width=' + w + ', height=' + h + ', top=' + top + ', left=' + left);
+
+            // Puts focus on the newWindow
+            if (window.focus) {
+                newWindow.focus();
+            }
+        }
+        function fn_SeatingChart() {
+            var GoTo = "https://www.stubhub.com/?event_id=" + SH_Event_ID;
+            PopupCenter(GoTo, "SHWindow", 800, 600);
+        }
+        function fn_SeatingPro() {
+            var GoTo = "https://pro.stubhub.com/simweb/sim/services/priceanalysis?eventId=" + SH_Event_ID;
+            PopupCenter(GoTo, "SHWindow", 800, 600);
+        }
+        function fn_Assign(Event_ID, Login_ID, value) {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Inventory/UpdateAssignment?Event_ID=" + Event_ID + "&Login_ID=" + Login_ID + "&NewValue=" + value;
+            $.ajax({ // update db
+                type: "GET",
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $('input:checkbox').removeAttr('checked');
+                    if (value)
+                        $("#" + Login_ID).prop("checked", true);
+                    $("#AssignedText").text(result);
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Assignment /" + thrownError);
+                }
+            });
+        }
+        function fn_Follow() {
+            $('#myPleaseWait').modal('show');
+            var CurText = $("#FollowText").text();
+            var URL = "../Inventory/FollowEvent?Event_ID=" + Event_ID + "&Type=" + CurText;
+            $.ajax({
+                type: "GET",
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#FollowText").text(result);
+                    if (result == "FOLLOW")
+                        $("#FollowIcon").text("star_border");
+                    else
+                        $("#FollowIcon").text("star");
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Event Follow /" + thrownError);
+                }
+            });
+        }
+        function fn_GetAssign() {
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var URL = "../Inventory/GetAssignedList?Event_ID=" + Event_ID;
+                setTimeout(function () {
+                    $.ajax({
+                        type: "GET",
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            var AssignedTable = $('#AssignedListTable').DataTable({
+                                "destroy": true,
+                                "autoWidth": true,
+                                "ordering": true,
+                                "scrollY": '40vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false,
+                                "order": [[1, "asc"]]
+                            });
+                            AssignedTable.clear()
+                            $.each(result, function (key, value) {
+                                AssignedTable.row.add([
+                                    "<input type='checkbox' id=" + value.Login_ID + " onchange='fn_Assign(" + Event_ID + "," + value.Login_ID + ", this.checked);' " +  ((value.Checked) ? "checked='checked'": "") + " />",
+                                    value.FullName
+                                ]).draw(false);
+                            })
+                            $("#AssignedListDiv").modal('show');
+                            setTimeout(function () {
+                                AssignedTable.draw();
+                            }, 250);
+                            $('#myPleaseWait').modal('hide');
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Getting Assigned List /" + thrownError);
+                        }
+                    });
+                }, 250);
+            }, 250);
+        }
+        $(document).ready(function () {
+            $("#page-content-wrapper").css('margin-top', -95);
+
+            window.onresize = function() {
+                AvailableTable.columns.adjust().draw();
+                SoldTable = $('#SoldTable').DataTable();
+                SoldTable.columns.adjust().draw();
+                var PreorderTable = $('#PreorderTable').DataTable();
+                PreorderTable.columns.adjust().draw();
+                var AutoPriceTable = $('#AutoPriceTable').DataTable();
+                AutoPriceTable.columns.adjust().draw();
+            }
+            $(document).keypress(function (e) {
+                if (e.which == 13) {
+                    curinput = $(document.activeElement).attr("id");
+                    var Inputs = curinput.split("_");
+                    if (Inputs[0] == "Price") {
+                        fn_ChangePrice(Inputs[1]);
+                    }
+                    if (Inputs[0] == "SHPrice") {
+                        fn_ChangeSHPrice(Inputs[1]);
+                    }
+                }
+            });
+            $("#multiple-items").css('display', 'flex');
+            $("#DisplayIcons").show();
+            $("#InventoryDiv").show();
+            $("#360Div").show();
+            var URL = 'LoadAvailable?Event_ID=' + Event_ID + '&PO_ID=' + PO_ID;
+            $.ajax({
+                url: URL,
+                async: false,
+                contentType: 'application/html; charset=utf-8',
+                type: 'GET',
+                dataType: 'html',
+                success: function (result) {
+                    $("#AvailableTable > tbody").html(result);
+                    AvailableTable = $('#AvailableTable').DataTable({
+                        "ordering": true,
+                        "scrollY": '40vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "autowidth": false,
+                        "columnDefs": [
+                            { targets: [20, 21, 22, 23], visible: false },
+                            { targets: [0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], orderable: false },
+                            { targets: [6], iDataSort: 20 },
+                            { targets: [1], iDataSort: 21},
+                            { targets: [2], iDataSort: 22}
+                        ],
+                        "order": [[1, "asc"]]
+                    });
+                    $("#AvailableTable tbody").on('click', 'tr', function(e) {
+                        idx = AvailableTable.row(this).index();
+                        var CurTableIndexs = AvailableTable.rows().indexes();
+                        var CurIndexArrayKey = CurTableIndexs.indexOf( idx );
+                        var NextItemIndex = CurTableIndexs[ CurIndexArrayKey + 1];
+                        NextID = AvailableTable.row(NextItemIndex).id().replace('ATTR_', '');
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Loading Available Inventory /" + thrownError);
+                }
+            });
+
+            $("#TicketQty").change(function(){
+                var QtySel = $("#TicketQty option:selected").text();
+                QtyFilter = $("#TicketQty option:selected").val();
+                var RegexFilter = "";
+                if (QtySel == "1 Ticket")
+                    RegexFilter="^([1]|[3-9]|1[0-9])$";
+                if (QtySel == "2 Tickets")
+                    RegexFilter="^([2]|[4-9]|1[0-9])$";
+                if (QtySel == "3 Tickets")
+                    RegexFilter="^([3]|[5-9]|1[0-9])$";
+                if (QtySel == "4 Tickets")
+                    RegexFilter="^([4]|[6-9]|1[0-9])$";
+                if (QtySel == "5+ Tickets")
+                    RegexFilter="^([5-9]|1[0-9])$";
+                StubhubTable.columns(3).search(RegexFilter,true,false,false).draw();
+                fn_RecalcTotals();
+            });
+            $("#SecList").change( function() {
+                SecList = $("#SecList option:selected").text().trim();
+                if (SecList == "All Sections")
+                {
+                    $("#CancelIcon").hide();
+                    AvailableTable.columns(1).search("").draw();
+                    StubhubTable.columns(1).search("").draw();
+                } else {
+                    $("#CancelIcon").show();
+                    AvailableTable.columns(1).search( "^"+SecList+"$",true,false,false).draw();
+                    StubhubTable.columns(1).search("^" + SecList+"$",true,false,false).draw();
+                }
+                fn_RecalcTotals();
+                if ($("#DisplayList :selected").text() == "Graph")
+                    fn_UpdateGraph();
+            })
+            $("#ZoneList").change( function() {
+                ZoneList = $("#ZoneList option:selected").text().trim();
+                if (ZoneList == "All Zones")
+                {
+                    $("#CancelIcon").hide();
+                    AvailableTable.columns(23).search("").draw();
+                    StubhubTable.columns(0).search("").draw();
+                } else {
+                    $("#CancelIcon").show();
+                    AvailableTable.columns(23).search("^"+ZoneList+"$",true,false,false).draw();
+                    StubhubTable.columns(0).search("^"+ZoneList+"$",true,false,false).draw();
+                }
+                fn_RecalcTotals();
+                if ($("#DisplayList :selected").text() == "Graph")
+                    fn_UpdateGraph();
+            })
+
+            // Event listener to the two range filtering inputs to redraw on input
+            $('#min, #max').keyup( function() {
+                table.draw();
+            });
+            $("#SoldDiv").show();
+            SoldTable = $('#SoldTable').DataTable({
+                "ordering": true,
+                "scrollY": '40vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "autowidth": false,
+                "order": [[0, "desc"]]
+            });
+
+            $("#PresaleDiv").show();
+            var PreorderTable = $('#PreorderTable').DataTable({
+                "ordering": true,
+                "scrollY": '40vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "autowidth": false,
+                "columnDefs": [
+                    { targets: [7], orderable: false }
+                ],
+                "order": [[0, "asc"]]
+            });
+            var AutoPriceTable = $('#AutoPriceTable').DataTable({
+                "ordering": true,
+                "scrollY": '40vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "autowidth": false,
+                "order": [[0, "asc"]]
+            });
+            $('#SourceStubhub').prop('checked', true);
+            $("#ExcludeTable").DataTable({
+                "ordering": true,
+                "scrollY": '240px',
+                "scrollCollapse": false,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "autowidth": false,
+            });
+            fn_ChangeSource();
+            if("@ViewData["High"]"!="")
+                $("#Weather").show();
+        });
+    </script>
+}
+<div id="TopBox" class="ExceptionBox" style="height:135px; width:85%; max-width:85%; margin-left:145px; margin-right:5px; margin-top:-130px; position:relative; float:left;">
+    <div style="max-width:75%; float:left;">
+        <div style="margin-left:10px; width:100%; max-width:100%; line-height:1em; height:2.4em; overflow:hidden;">
+            <label class="-Listings" style="margin-left:0px;">@ViewData["EventDate"]</label>
+            <i class="material-icons" style="margin-top:15px;font-size:14px; color:#adc72e; float:left;">grade</i>
+            <label class="-Listings" style="margin-left:-10px;">@ViewData["DUE"] Days Until Event</label>
+            <i class="material-icons" style="margin-top:15px;font-size:14px; color:#adc72e; float:left;">grade</i>
+            <label class="-Listings" style="margin-left:-10px;">@ViewData["VenueName"]</label>
+            <i class="material-icons" style="margin-top:15px;font-size:14px; color:#adc72e; float:left;">grade</i>
+            <label class="-Listings" style="margin-left:-10px;">@ViewData["VenueCity"]</label>
+            <i class="material-icons" style="margin-top:15px;font-size:14px; color:#adc72e; float:left;">grade</i>
+            <label class="-Listings" style="margin-left:-10px;">@ViewData["Ranking"]</label>
+        </div>
+        <div style="margin-left:10px; width:100%; max-width:100%; font-size:40px; line-height:1em; height:2em; overflow:hidden;">
+            @ViewData["EventName"]
+        </div>
+    </div>
+        <div style="height:100%; float:right;">
+            <div style="height:100%; float:left;">
+                <div class="NavLine" style="width:120px;height:30px;border-radius:4px; border:solid 1px #e5e5e5; margin-right:10px; margin-left:auto; margin-top:20px;" title="@ViewData["FollowingText"]" onclick="fn_Follow();">
+                    <i id="FollowIcon" class="material-icons" style="width:24px; height:24px; line-height:1; color:#adc72e; margin:5px;">@ViewData["FollowIcon"]</i>
+                    <h1 id="FollowText" style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#656565;">@ViewData["FollowText"]</h1>
+                </div>
+
+                <div class="NavLine" style="width:120px;height:30px;border-radius:4px; border:solid 1px #e5e5e5; margin-right:10px; margin-left:auto; margin-top:20px;" title="@ViewData["AssignText"]" onclick="fn_GetAssign();">
+                    <i class="material-icons" style="width:24px; height:24px; line-height:1; color:#adc72e; margin:5px;">group_add</i>
+                    <h1 style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#656565;">ASSIGN</h1>
+                </div>
+            </div>
+            <div id="Weather" style="height:100%; width:100px; background-color:aliceblue; border-radius:4px; float:left; display:none;">
+                <div style="width:100%;">
+                    <div style="margin-left:10px; float:left; font-size:24px; color:lightblue;">@ViewData["Low"]&deg;</div>
+                    <div style="margin-right:10px; float:right; font-size:24px;">@ViewData["High"]&deg;</div>
+                </div>
+                <div style="width:100%; float:left;">
+                    @Html.Raw(ViewData["Icons"])
+                </div>
+                <div style="width:100%; display:flex; margin-top:85px; text-align:center;">
+                    <div style="margin:0 auto;">@ViewData["Description"]</div>
+                </div>
+                <div style="width:100%; ">
+                    <div style="margin-left:10px; float:left;">@ViewData["Rain"]</div>
+                    <div style="margin-right:10px; float:right;">@ViewData["Chance"]</div>
+                </div>
+                <div style="width:100%; display:flex; text-align:center;">
+                    <div style="margin:0 auto;">@ViewData["Wind"]<img src="~/Images/wind.png" style="height:15px;" /></div>
+                </div>
+            </div>
+        </div>
+    </div>
+<div id="multiple-items" style="display:none; width:96%; height:120px; justify-content:space-between; max-width:96%; float:left; margin-top:20px; margin-left:2%; margin-right:2%; position:relative; float:left;">
+    <div class="ExceptionBox" style="width:auto; height:auto; min-width:16%;">
+        <h1 style="margin-top:10px; text-align:center; font-size:12px; font-weight:bold; line-height:1.33; letter-spacing:0.5px; color:#656565;">LAST&nbsp;SOLD</h1>
+        <h1 style="font-size:40px; font-weight:300; line-height:1; text-align:center; color:#353535;">@ViewData["LastSoldDate"]</h1>
+        <h1 style="font-size:13px; line-height:1.23; text-align:center; color:#959595;">Last Priced @ViewData["LastPricedDate"]</h1>
+    </div>
+    <div class="ExceptionBox" style="width:auto; height:auto; min-width:16%;">
+        <h1 style="margin-top:10px; text-align:center; font-size:12px; font-weight:bold; line-height:1.33; letter-spacing:0.5px; color:#656565;">AVAILABLE&nbsp;QTY</h1>
+        <h1 style="font-size:40px; font-weight:300; line-height:1; text-align:center; color:#353535;">@ViewData["AvailableQty"]</h1>
+        <h1 id="MktAvailableQty" style="font-size:13px; line-height:1.23; text-align:center; color:#959595;">Sold Qty @ViewData["SoldQty"]</h1>
+    </div>
+    <div class="ExceptionBox" style="width:auto; height:auto; min-width:16%;">
+        <h1 style="margin-top:10px; text-align:center; font-size:12px;font-weight:bold; line-height:1.33; letter-spacing:0.5px; color:#656565;">AVAILABLE&nbsp;COST</h1>
+        <h1 style="font-size: 40px; font-weight:300; line-height:1; text-align:center; color:#353535;">@ViewData["AvailableCost"]</h1>
+        <h1 id="MktTotalCost" style="font-size:13px; line-height:1.23; text-align:center; color:#959595;">Total&nbsp;Cost&nbsp;$@ViewData["TotalCost"]</h1>
+    </div>
+    <div class="ExceptionBox" style="width:auto; height:auto; min-width:16%;">
+        <h1 style="margin-top:10px; text-align:center; font-size:12px; font-weight:bold; line-height:1.33; letter-spacing:0.5px; color:#656565;">SOLD&nbsp;PRICE</h1>
+        <h1 style="font-size: 40px; font-weight:300; line-height:1; text-align:center; color:#353535;">$@ViewData["SoldPrice"]</h1>
+        <h1 id="MktSoldProfit" style="font-size:13px; line-height:1.23; text-align:center; color:#959595;">SOLD&nbsp;Cost&nbsp;$@ViewData["SoldCost"]</h1>
+    </div>
+    <div class="ExceptionBox" style="width:auto; height:auto; min-width:16%;">
+        <h1 style="margin-top:10px; text-align:center; font-size:12px; font-weight:bold; line-height:1.33; letter-spacing:0.5px; color:#656565;">SOLD&nbsp;PROFIT</h1>
+        <h1 style="font-size: 40px; font-weight:300; line-height:1; text-align: center; color:#353535;">$@ViewData["SoldProfit"]</h1>
+        <h1 id="MktSoldMargin" style="font-size:13px; line-height:1.23; text-align:center; color:#959595;">Margin&nbsp;@ViewData["SoldMargin"]%</h1>
+    </div>
+</div>
+<div id="DisplayIcons" style="display:none; width:99%; max-width:99%; margin-left:5px; margin-right:5px; margin-top:15px; position:relative; float:left; background-color:transparent;">
+    <div style="width:14%; height:70px; display:block; float:left;" onclick="fn_DisplayPage('Inventory');">
+        <i class="DisplayIcon material-icons" id="DisplayInventoryIcon" style="font-size:32px; line-height:1; text-align:center; color:#353535; display:inherit;">confirmation_number</i>
+        <h1 class="DisplayText" id="DisplayInventoryText" style="margin-top:0px; font-size:12px; font-weight:500; line-height:2; letter-spacing:0.5px; text-align:center; color:#353535;">INVENTORY</h1>
+    </div>
+    <div style="width:14%; height:70px; float:left;" onclick="fn_DisplayPage('AutoPrice');">
+        <i class="DisplayIcon material-icons" id="DisplayAutoPriceIcon" style="font-size:32px; line-height:1; text-align:center; color: #959595; display:inherit;">track_changes</i>
+        <h1 class="DisplayText" id="DisplayAutoPriceText" style="margin-top:0px; font-size:12px; font-weight:500; line-height:2; letter-spacing:0.5px; text-align:center; color:#959595;">AUTO PRICING</h1>
+    </div>
+    <div style="width:14%; height:70px; float:left;" onclick="fn_DisplayPage('Alerts');">
+        <i class="DisplayIcon material-icons" id="DisplayAlertsIcon" style="font-size:32px; line-height:1; text-align:center; color: #959595; display:inherit;">add_alert</i>
+        <h1 class="DisplayText" id="DisplayAlertsText" style="margin-top:0px; font-size:12px; font-weight:500; line-height:2; letter-spacing:0.5px; text-align:center; color:#959595;">ALERTS</h1>
+    </div>
+    <div style="width:14%; height:70px; float:left;" onclick="fn_OpenCharts(Event_ID);">
+        <i class="DisplayIcon material-icons" id="DisplayStatsIcon" style="font-size:32px; line-height:1; text-align:center; color: #959595; display:inherit;">equalizer</i>
+        <h1 class="DisplayText" id="DisplayStatsText" style="margin-top:0px; font-size:12px; font-weight:500; line-height:2; letter-spacing:0.5px; text-align:center; color:#959595;">MARKET STATS</h1>
+    </div>
+    <div style="width:14%; height:70px; float:left;" onclick="fn_DisplayPage('Activity');">
+        <i class="DisplayIcon material-icons" id="DisplayActivityIcon" style="font-size:32px; line-height:1; text-align:center; color: #959595; display:inherit;">update</i>
+        <h1 class="DisplayText" id="DisplayActivityText" style="margin-top:0px; font-size:12px; font-weight:500; line-height:2; letter-spacing:0.5px; text-align:center; color:#959595;">ACTIVITY</h1>
+    </div>
+    <div style="width:14%; height:70px; float:left;" onclick="fn_SeatingChart();">
+        <img src="~/Images/stubhub.png" height="32" style="display:inherit; margin:0 auto;" />
+        <h1 style="margin-top:0px; font-size:12px; font-weight:500; line-height:2; letter-spacing:0.5px; text-align:center; color:#959595;">SEATING VIEW</h1>
+    </div>
+    <div style="width:14%; height:70px; float:left;" onclick="fn_SeatingPro();">
+        <img src="~/Images/stubhub.png" height="32" style="display:inherit; margin:0 auto;" />
+        <h1 style="margin-top:0px; font-size:12px; font-weight:500; line-height:2; letter-spacing:0.5px; text-align:center; color:#959595;">PRO VIEW</h1>
+    </div>
+</div>
+<div class="MainDiv" id="InventoryDiv" style="width:99%; max-width:99%; display:none; position:relative; margin-left:5px; border-radius:4px; margin-right:5px; float:left; background-color:rgba(0,84,159,0.1); box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.5);">
+    <div id="360Div" style="display:none; max-width:69%; width:69%; margin-left:5px; margin-right:5px; float:left;">
+        <div style="width:100%; display:flex; justify-content:space-between; ">
+            <div style="float:left; display:block; vertical-align:top; text-align:center;">
+                <h1 style="margin-top:15px; font-size:30px; font-weight:300; line-height:1.27; color:#353535; float:left;">360 Access</h1>
+            </div>
+
+            <div style="float:left; display:block; padding:5px; margin-top:5px; margin-right:10px; vertical-align:top; text-align:center; background-color:rgb(236,242,249); border-radius:6px;">
+                <h1 style="font-size:12px; font-weight:bold; color:#656565;">MANAGE PRICING</h1>
+                <div class="NavLine" title="Reload remote data and recalculate suggested price." style="margin-left:5px; height:30px;border-radius:4px; border:solid 1px #e5e5e5; margin-right:5px; background-color:#ffffff; float:left;" onclick="fn_ReloadRemote();">
+                    <i class="material-icons" style="width:24px; height:24px; line-height:1; color:#959595;">refresh</i>
+                    <h1 style="margin:5px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#656565;">SUGGESTED</h1>
+                </div>
+                <div id="BulkDiv" class="ExceptionBox" style="height:270px; position:absolute; margin-top:35px; margin-left:-7px; z-index:9999;  display:none;">
+                    <label style="font-size:24px;">Update Selected Items</label>
+                    <div style="margin-top:10px;">
+                        <label>Change Price $</label>
+                        <input id="ChangeDollars" onkeyup="fn_KeyChangeDollar();" style="width:60px;" />
+                        <label>&nbsp;&nbsp;or&nbsp;</label>
+                        <input id="ChangePercent" onkeyup="fn_KeyChangePercent();" style="width:40px;" />
+                        <label>%</label>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <label>Change Hold</label>
+                        <select id="BulkHold">
+                            <option index=0>No Change</option>
+                            <option index=1>Remove Hold</option>
+                            <option index=2>30 Min</option>
+                            <option index=3>1 Hour</option>
+                            <option index=4>Untimed</option>
+                        </select>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <label>Add to Internal Notes:&nbsp;</label>
+                        <input id="AddToNotes" />
+                    </div>
+                    <div id="BulkShareTableDiv" style="margin-top:10px;">
+                    </div>
+                    <div style="margin-top:10px;">
+                        <button type="button" class="btn btn-default" style="background-color:#aec72d; color:#ffffff;" onclick="fn_DoBulkUpdate();">Update</button>
+                        <button type="button" class="btn btn-default" style="background-color:#aec72d; color:#ffffff;" onclick="fn_CloseBulkUpdate();">Close</button>
+                    </div>
+                </div>
+                <div class="NavLine" style="height:30px;border-radius:4px; border:solid 1px #e5e5e5; margin-right:5px; background-color:#ffffff; float:left" onclick="">
+                    <h1 style="margin:5px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#656565;" onclick="fn_BulkPricing();">BULK UPDATE</h1>
+                </div>
+                <div class="NavLine" style="height:30px;border-radius:4px; border:solid 1px #e5e5e5; margin-right:5px; background-color:#ffffff; float:left" onclick="fn_AutoPrice();">
+                    <h1 style="margin:10px;height: 24px;font-size: 12px;font-weight: 500;line-height:2;letter-spacing:0.5px;color:#656565;">AUTO PRICE</h1>
+                </div>
+            </div>
+
+
+            <div style="float:left; display:block; padding:5px; margin-top:5px; margin-right:40px; vertical-align:top; text-align:center; background-color:rgb(236,242,249); border-radius:6px;">
+                <div style="display:inline-block; width:100%; margin:auto 0; float:left;">
+                    <label id="SectionZone" style="font-size:12px; font-weight:bold; color:#656565; margin-top:0px;"  onclick="fn_ChangeSectionZone()" >SECTION FILTER</label>
+                    <i id="CancelIcon" class="material-icons" style="font-size:15px; display:none;" onclick="fn_ResetFilter();">cancel</i>
+                </div>
+                <div style="display:inline-block; margin:auto 0; float:left; clear:both;">
+                    <div class="NavLine" style="margin-left:5px; margin-top:3px; height:30px; margin-right:5px; float:left;">
+                        <div id="SecDiv"><select id="SecList" class="RoundedDropDown" style="background-color:#ffffff; max-width:90px;"></select></div>
+                        <div id="ZoneDiv"><select id="ZoneList" class="RoundedDropDown" style="background-color:#ffffff; max-width:90px;"></select></div>
+                    </div>
+                    <div style="float:left; margin-top:5px; margin-left:5px; margin-right:5px;">
+                        <select id="TicketQty" class="RoundedDropDown">
+                            <option value="0">All Tickets</option>
+                            <option value="1">1 Ticket</option>
+                            <option value="2">2 Tickets</option>
+                            <option value="3">3 Tickets</option>
+                            <option value="4">4 Tickets</option>
+                            <option value="5">5+ Tickets</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="AvailableTableDiv" style="width:100%; background-color:transparent; float:left;">
+            <table id="AvailableTable" class="table-bordered table-condensed" style="width:100%;border-radius:4px; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); background-color:white;" border="0">
+                <thead>
+                     <tr style="height:30px;">
+                        <th style="text-align:left; border:none; border-bottom:solid black 1px; padding-left:9px;"><input type="checkbox" id="AllItems" onclick="fn_CheckAllItems();" /></th>
+                        <th style="text-align:left; border:none; border-bottom:solid black 1px;">Sec</th>
+                        <th style="text-align:left; border:none; border-bottom:solid black 1px;">Row</th>
+                        <th style="text-align:left; border:none; border-bottom:solid black 1px;">Seats</th>
+                        <th style="text-align:right; border:none; border-bottom:solid black 1px; max-width:25px;">Qty</th>
+                        <th style="text-align:right; border:none; background-color:#353535; color:white; ">COST</th>
+                        <th style="text-align:right; border:none; background-color:#353535; color:white; ">PRICE</th>
+                        <th style="text-align:right; border:none; background-color:#353535; color:white; ">STUBHUB</th>
+                        <th style="text-align:center; border:none; background-color:#353535; color:white; ">LOW PRICE</th>
+                        <th style="text-align:center; border:none; background-color:#353535; color:white;">SH</th>
+                        <th style="text-align:center; border:none; background-color:#353535; color:white;">EI</th>
+                        <th style="text-align:center; border:none; background-color:#353535; color:white;">VI</th>
+                        <th style="text-align:center; border:none; background-color:#353535; color:white;">SG</th>
+                        <th style="text-align:center; border:none; background-color:#353535; color:white;">714</th>
+                        <th style="text-align:center; border:none; background-color:#353535; color:white;">ALL</th>
+                        <th style="text-align:center; border:none; border-bottom:solid black 1px;">Int</th>
+                        <th style="text-align:center; border:none; border-bottom:solid black 1px;">S/M</th>
+                        <th style="text-align:center; border:none; border-bottom:solid black 1px;">Auto</th>
+                        <th style="text-align:center; border:none; border-bottom:solid black 1px;">Hold</th>
+                        <th style="text-align:left; border:none; border-bottom:solid black 1px;"></th>
+                        <th>Price2</th>
+                        <th>Row2</th>
+                        <th>Section2</th>
+                        <th>Zone</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="4" style="color:white; background-color:#00549f; border:none;">Totals</th>
+                        <th id="xAvailableCount" style="text-align:center; color:white; background-color:#00549f; border:none; padding-right:4px;">@Html.Raw(@ViewData["QtyTotal"])</th>
+                        <th id="xAvailableCost" style="text-align:right; color:white; background-color:#353535; border:none; padding-right:4px;">@ViewData["AvaCost"]</th>
+                        <th id="xAvailablePrice" style="text-align:right; color:white; background-color:#353535; border:none; padding-right:4px;">@ViewData["AvaPrice"]</th>
+                        <th colspan="2" style="color:white; background-color:#353535; border:none;"></th>
+                        <th colspan="6" style="color:white; background-color:#353535; border:none;">
+                            <div class="NavLine" style="height:24px; float:right;" onclick="">
+                                <i class="material-icons" style="width:24px; height:24px; line-height:1; color:white">track_changes</i>
+                                <h1 id="AvailableAlerts" ; style="margin:10px;height:24px; font-size:12px; font-weight:500; line-height:2;letter-spacing:0.5px;color:white">0 items in 0 listings</h1>
+                            </div>
+                        </th>
+                        <th colspan="9" style="color:white; background-color:#00549f; border:none;"></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    <div id="RemoteDiv" style="max-width:29%; width:29%; margin-left:5px; margin-right:5px; float:left;">
+        <div style="width:100%; display:flex; justify-content:space-between; ">
+            <div style="float:left; display:inline-block; vertical-align:top; text-align:center;">
+                <h1 id="RemoteTitle" style="margin-top:15px; font-size:30px; font-weight:300; line-height:1.27; color:#353535; float:left;">Stubhub</h1>
+            </div>
+            <div id="SecFilter2" style="float:left; display:block; padding:5px; margin-top:5px; margin-right:40px; vertical-align:top; text-align:center; background-color:rgb(236,242,249); border-radius:6px;">
+                <h1 style="font-size:12px; font-weight:bold; color:#656565;">DISPLAY OPTIONS</h1>
+                <div class="NavLine" style="display:inline-block; height:30px; margin:auto 0; width:100%;">
+                    <select id="DisplayList" class="RoundedDropDown" onchange="fn_ChangeDisplay();">
+                        <option value="1">Normal</option>
+                        <option value="2">Graph</option>
+                        <option value="3">Tall</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="GraphDiv" style="width:100%; margin-top:40px; display:none">
+            <div style="width:96%; margin-left:2%; margin-top:-30px; margin-bottom:10px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.38); float:left;">
+                <div class="flotcontainer" id="TopChart" style="width:100%;height:180px;text-align:left"></div>
+            </div>
+            <div style="width:96%; margin-left:2%; margin-bottom:10px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.38); float:left;">
+                <div class="flotcontainer" id="BottomChart" style="width:100%;height:180px;text-align:left"></div>
+            </div>
+        </div>
+        <div id="StubhubDiv" style="display:none; width:100%; float:left; background-color:transparent;">
+            <table id="StubhubTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); ">
+                <thead>
+                    <tr style="height:30px;">
+                        <th style="padding-left:4px; border-bottom:solid black 1px;">Zone</th>
+                        <th style="padding-left:4px; border-bottom:solid black 1px;">Sec</th>
+                        <th style="border-bottom:solid black 1px;">Row</th>
+                        <th style="text-align:right; border-bottom:solid black 1px;">Qty</th>
+                        <th style="text-align:right; background-color:#353535; color:white; border-bottom:solid black 1px;">Price</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+                <tfoot>
+                    <tr style="height:24px;">
+                        <th colspan="3" style="color:white; background-color:#00549f; border-color:#00549f; ">Totals</th>
+                        <th id="SHAvailableQty" ; style="text-align:center;color:white; background-color:#00549f; border:none; ">999</th>
+                        <th id="SHAvailablePrice" ; style="text-align:right; padding-right:4px; color:white; background-color:#353535; border-color:#353535; ">999.99</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    <div id="SoldDiv" style="display:none; width:59%; margin-top:10px; margin-bottom:10px; margin-left:5px; margin-right:5px; float:left;">
+        <h1 style="font-size:30px; font-weight:300; line-height:1.27; color:#353535; float:left;">@ViewData["InvoicesSold"]</h1>
+        <div style="width:100%; background-color:transparent; float:left;">
+            <table id="SoldTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+                <thead>
+                    <tr style="height:30px;">
+                        <th style="padding-left:4px; border:none; border-bottom:solid black 1px;">Inv</th>
+                        <th style="border:none; border-bottom:solid black 1px;">Date</th>
+                        <th style="border:none; border-bottom:solid black 1px;">Cust</th>
+                        <th style="border:none; border-bottom:solid black 1px;">Sec</th>
+                        <th style="border:none; border-bottom:solid black 1px;">Row</th>
+                        <th style="border:none; border-bottom:solid black 1px;">Seats</th>
+                        <th style="text-align:right; border:none; border-bottom:solid black 1px;">Qty</th>
+                        <th style="text-align:right; background-color:#353535; color:white; border:none; border-bottom:solid black 1px;">Cost</th>
+                        <th style="text-align:right; background-color:#353535; color:white; border:none; border-bottom:solid black 1px;">Price</th>
+                        <th style="text-align:right; background-color:#353535; color:white; border:none; border-bottom:solid black 1px;">Profit</th>
+                        <th style="text-align:right; background-color:#353535; color:white; border:none; border-bottom:solid black 1px;">Margin</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in (List<spGet_ItemsForEventSold_Result>)ViewData["ItemsSold"])
+                    {
+                        <tr class="TableTr">
+                            <td style="padding-left:4px; border:none;">@Html.DisplayFor(modelitem => item.Invoice_ID)</td>
+                            <td style="border:none;">@Html.DisplayFor(modelitem => item.Invoice_Date)</td>
+                            <td style="border:none;"><a href="#" title="@item.Name">@item.Customer</a></td>
+                            <td style="border:none;">@Html.DisplayFor(modelitem => item.Section)</td>
+                            <td style="border:none;">@Html.DisplayFor(modelitem => item.Row)</td>
+                            <td style="border:none;">@Html.DisplayFor(modelitem => item.Seats)</td>
+                            <td style="border:none; text-align:center;">@Html.DisplayFor(modelitem => item.Qty)</td>
+                            <td style="border:none; text-align:right; padding-right:4px; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Cost)</td>
+                            <td style="border:none; text-align:right; padding-right:4px; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Price)</td>
+                            <td style="border:none; text-align:right; padding-right:4px; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Profit)</td>
+                            <td style="border:none; text-align:right; padding-right:4px; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:n}", item.Margin)%</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="6" style="color:white; background-color:#00549f; border:none; ">Totals</th>
+                        <th id="SoldQty" style="text-align:center; color:white; background-color:#00549f; border:none; ">@ViewData["InvoicesSoldQty"]</th>
+                        <th id="SoldCost" style="text-align:right; padding-right:4px; color:white; background-color:#353535; border:none; ">@ViewData["InvoicesSoldCost"]</th>
+                        <th id="SoldPrice" style="text-align:right; padding-right:4px; color:white; background-color:#353535; border:none; ">@ViewData["InvoicesSoldPrice"]</th>
+                        <th id="SoldProfit" style="text-align:right; padding-right:4px; color:white; background-color:#353535; border:none; ">@ViewData["InvoicesSoldProfit"]</th>
+                        <th style="text-align:right; padding-right:4px; color:white; background-color:#353535; border:none;">@ViewData["SoldMargin"]%</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    <div id="PresaleDiv" style="display:none; width:39%; margin-top:10px; margin-bottom:10px; margin-left:5px; margin-right:5px; float:left;">
+        <h1 style="font-size:30px; font-weight:300; line-height:1.27; color:#353535; float:left;">@ViewData["PresaleInvoices"]</h1>
+        <div style="width:100%;  float:left;">
+            <table id="PreorderTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+                <thead>
+                    <tr style="height:30px;">
+                        <th></th>
+                        <th style="padding-left:4px; border:none; border-bottom:solid black 1px;">Inv</th>
+                        <th style="border:none; border-bottom:solid black 1px;">Name</th>
+                        <th style="border:none; border-bottom:solid black 1px;">Sec</th>
+                        <th style="border:none; border-bottom:solid black 1px;">Row</th>
+                        <th style="border:none; border-bottom:solid black 1px; text-align:right; border:none; border-bottom:solid black 1px;">Qty</th>
+                        <th style="border:none; border-bottom:solid black 1px; text-align:right; background-color:#353535; color:white; ">Price</th>
+                        <th style="padding-right:4px; border:none; border-bottom:solid black 1px; text-align:right; background-color:#353535; color:white; ">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in (List<spGet_PresalesForEvent2_Result>)ViewData["PresaleItems"])
+                    {
+                        <tr class="TableTr" id="PSTR_@item.category_ticket_group_id">
+                            <td closs="PresalesTD" id="TD8_@item.category_ticket_group_id" style="padding-left:4px;border:none;"><input class="PresalesCheckBox" type="checkbox" id="CB_@item.category_ticket_group_id" onclick="fn_PresaleClick(@item.category_ticket_group_id);" /></td>
+                            <td class="PresalesTD" id="TD1_@item.category_ticket_group_id" style="text-align:left; padding-left:4px; border:none;">@Html.DisplayFor(modelitem => item.invoice_id)</td>
+                            <td class="PresalesTD" id="TD2_@item.category_ticket_group_id" style="border:none;"><a href="#" title="@item.Name2">@item.Name</a></td>
+                            <td class="PresalesTD" id="TD3_@item.category_ticket_group_id" style="border:none;">@Html.DisplayFor(modelitem => item.Section)</td>
+                            <td class="PresalesTD" id="TD4_@item.category_ticket_group_id" style="border:none;">@Html.DisplayFor(modelitem => item.Row)</td>
+                            <td class="PresalesTD" id="TD5_@item.category_ticket_group_id" style="text-align:center; border:none;">@Html.DisplayFor(modelitem => item.Qty)</td>
+                            <td  id="TD6_@item.category_ticket_group_id" style="text-align:right; border:none; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Price)</td>
+                            <td  id="TD7_@item.category_ticket_group_id" style="padding-right:4px; text-align:right; border:none; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Price * item.Qty)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="5" style="padding-left:4px; color:white; background-color:#00549f; border-color:#00549f; ">Totals</th>
+                        <th id="TPresaleQty" style="text-align:center; color:white; background-color:#00549f; border-color:#00549f; ">@ViewData["PresaleQty"]</th>
+                        <th colspan="2" id="TPresalePrice" style="text-align:right; padding-right:4px; color:white; background-color:#353535; border-color:#353535; ">@ViewData["PresalePrice"]</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+<div class="MainDiv" id="AutoPriceDiv" style="width:99%; max-width:99%;  display:none; position:relative; margin-left:5px; margin-right:5px; float:left; background:#ffffff; background: -webkit-linear-gradient(#ffffff, #f5f5f5); background: -o-linear-gradient(#ffffff, #f5f5f5); background: -moz-linear-gradient(#ffffff, #f5f5f5); background: linear-gradient(#ffffff, #f5f5f5); box-shadow:0 -8px 16px 0 rgba(53, 53, 53, 0.04);">
+    <h1 style="font-size:30px; font-weight:300; line-height:1.27; margin-left:20px; color:#353535; float:left;">Autoprice</h1>
+</div>
+<div class="MainDiv" id="AlertsDiv" style="width:99%; max-width:99%; display:none; position:relative; margin-left:5px; margin-right:5px; float:left; background:#ffffff; background: -webkit-linear-gradient(#ffffff, #f5f5f5); background: -o-linear-gradient(#ffffff, #f5f5f5); background: -moz-linear-gradient(#ffffff, #f5f5f5); background: linear-gradient(#ffffff, #f5f5f5); box-shadow:0 -8px 16px 0 rgba(53, 53, 53, 0.04);">
+    <h1 style="font-size:30px; font-weight:300; line-height:1.27; margin-left:20px; color:#353535; float:left;">Alerts</h1>
+    Get all existing alerts for event
+    add alerts for event section
+</div>
+<div class="MainDiv" id="ActivityDiv" style="width: 99%; max-width: 99%; display:none; position:relative; margin-left:5px; border-radius: 4px; margin-right: 5px; float: left; background-color: rgba(0, 84, 159, 0.1); box-shadow: rgba(53, 53, 53, 0.5) 0px 2px 8px 0px;">
+    <h1 style="font-size:30px; font-weight:300; line-height:1.27; margin-left:20px; color:#353535; float:left;">Activity</h1>
+    <div id="ActivityTableDiv" style="width:90%; margin-top:20px; margin-bottom:20px; margin-left:20px; margin-right:auto; border-radius:4px;background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53,53,53,0.08); float:left;">
+        <table id="ActivityTable" class="table-bordered table-condensed" style="border-color:white;">
+            <thead>
+                <tr>
+                    <th>Message</th>
+                    <th>User</th>
+                    <th>Created</th>
+                    <th>SortDate</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+<!-- Modal Starts here-->
+<div class="modal loadingModal" id="DetailTableDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" style="color:white; float:left;">Details</h1>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Half of the modal-body div-->
+                    <div class="col-xs-6" style="width:45%">
+                        <table id="DetailTable" class="table-responsive table-bordered table-condensed" style="border-color:white; margin-left:auto; margin-right:auto;">
+                            <thead>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <!-- Other half of the modal-body div-->
+                    <div class="col-xs-6">
+                        <div id="InternalNotesDiv" style="margin-top:40px; width:100%; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+                            <h1>Internal Notes</h1>
+                            <textarea rows="5" columns="100" style="width:100%; background-color:lightblue;" id="dInternalNotes" onchange="fn_UpdateDetails('Internal');"></textarea>
+                        </div>
+                        <div id="ExternalNotesDiv" style="margin-top:40px; width:100%; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+                            <h1>External Notes</h1>
+                            <textarea rows="5" columns="100" style="width:100%; background-color:lightblue;" id="dExternalNotes" onchange="fn_UpdateDetails('External');"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="AssignedListDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" style="color:white; float:left;">Assignment</h1>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="AssignedListTable" class="table-responsive">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Name</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="ListingDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" style="color:white; float:left;">Details</h1>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="AssignedListTable" class="table-responsive">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Name</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="714Div" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" style="color:white; float:left;">714 Shares</h1>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_Close714();">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="714Table" class="table-responsive table-bordered table-condensed" style="border-color:white; margin-left:auto; margin-right:auto;">
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="EventMatchDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:185px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" style="color:white; float:left;">Stubhub events found</h1>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_Close714();">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="MatchTable" class="table-responsive table-bordered table-condensed" style="border-color:white; margin-left:auto; margin-right:auto;" border="0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Date</th>
+                            <th>Venue</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="EventMatchDiv" style="display:none; min-width:600px">
+    <div class="modal-body">
+        <table style="background-color:Highlight; margin:auto; width:75%" border="0">
+            <tr>
+                <td style="text-align:center"><h1>Select matching event</h1></td>
+            </tr>
+            <tr><td>&nbsp;</td></tr>
+            <tr>
+                <td>
+                    <div class="CSSTableGenerator">
+                        <table id="MatchTable" class="table-responsive" border="0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Date</th>
+                                    <th>Venue</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+            <tr><td>&nbsp;</td></tr>
+            <tr>
+                <td style="text-align:center">
+                    <button type='button' class='ui-button-text' onclick="$('#EventMatchDiv').modal('hide');">Cancel without matching</button>
+                </td>
+            </tr>
+            <tr><td>&nbsp;</td></tr>
+        </table>
+    </div>
+</div>
+
+    <div class="modal loadingModal" id="HoldDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:185px;">
+        <div class="modal-dialog modal-sm" style="border-radius:4px;">
+            <div class="modal-content" style="border-radius:6px; background-color:#f5f5f5;">
+                <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                    <h1 class="-Info" style="color:white; float:left;">Hold Items</h1>
+                </div>
+                <div class="modal-body">
+                    <table style="width:100%" border="0">
+                        <tr>
+                            <td style="text-align:center;">
+                                <label for="HoldDD">Select # or seats to Hold:</label>
+                                <select class="RoundedDropDown" id="HoldDD"></select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align:center;">
+                                <p>
+                                    <input type="radio" name="HoldTime" id="HoldOne" value="30" checked="checked" />
+                                    <label for="HoldOne">30 Min</label>
+                                    <input type="radio" name="HoldTime" id="HoldThirty" value="60" />
+                                    <label for="HoldThirty">1 Hour</label>
+                                    <input type="radio" name="HoldTime" id="HoldUntimed" value="0" />
+                                    <label for="HoldUntimed">Untimed</label>
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align:center">
+                                <label for="HoldNotes">Notes:</label>
+                                <input id="HoldNotes" />
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="modal-footer" style="text-align:center;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_PlaceHold();">Place Hold</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="$('#ATTR_'+vListing_ID).css('background-color', OldColor);">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal loadingModal" id="SplitDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:185px;">
+        <div class="modal-dialog modal-sm" style="border-radius:4px;">
+            <div class="modal-content" style="border-radius:6px; background-color:#f5f5f5;">
+                <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                    <h1 class="-Info" style="color:white; float:left;">Split Ticketblock</h1>
+                </div>
+                <div class="modal-body">
+                    <table style="width:100%" border="0">
+                        <tr>
+                            <td style="text-align:center;">
+                                <label for="SplitDD">Select # or seats to Split:</label>
+                                <select class="RoundedDropDown" id="SplitDD"></select>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="modal-footer" style="text-align:center;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_DoSplit();">Split</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="$('#ATTR_'+vListing_ID).css('background-color', OldColor);">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Ends here-->
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/jquery.flot@0.8.3/jquery.flot.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/jquery.flot@0.8.3/jquery.flot.selection.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/jquery.flot@0.8.3/jquery.flot.time.min.js"></script>

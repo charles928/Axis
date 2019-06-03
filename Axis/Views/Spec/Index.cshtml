@@ -1,0 +1,342 @@
+﻿@model IEnumerable<spGet_Spec_Result>
+@{
+    ViewBag.Title = "Spec";
+}
+@section scripts {
+    <script type="text/javascript">
+        var Parent_ID = @Session["Parent_ID"];
+        var Child_ID = @Session["Child_ID"];
+        var Grandchild_ID = @Session["Grandchild_ID"];
+        var Range = @Session["Range"];
+
+        function fn_DateRange() {
+            var selected = $("input[type='radio'][name='eventrange']:checked").val();
+            alert(selected);
+        }
+        function fn_CloseAdvancedSearch() {
+            $('.modal.in:visible').modal('hide');
+        }
+        function launchApplication(l_url, l_windowName)
+        {
+            if ( typeof launchApplication.winRefs == 'undefined' )
+            {
+                launchApplication.winRefs = {};
+            }
+            if ( typeof launchApplication.winRefs[l_windowName] == 'undefined' || launchApplication.winRefs[l_windowName].closed )
+            {
+                var l_width = screen.availWidth;
+                var l_height = screen.availHeight;
+
+                var l_params = 'status=1' +
+                               ',resizable=1' +
+                               ',scrollbars=1' +
+                               ',width=' + l_width +
+                               ',height=' + l_height +
+                               ',left=0' +
+                               ',top=0';
+
+                launchApplication.winRefs[l_windowName] = window.open(l_url, l_windowName);//, l_params);
+                launchApplication.winRefs[l_windowName].moveTo(0,0);
+                launchApplication.winRefs[l_windowName].resizeTo(l_width, l_height);
+            } else {
+                launchApplication.winRefs[l_windowName].focus()
+            }
+        }
+        function fn_SelectEvent(Event_ID) {
+            $("#TR_" + Event_ID).css('background-color', 'lightblue');
+            var Url = "../Inventory/Index?Event_ID=" + Event_ID + "&PO_ID=0";
+            launchApplication(Url, "#TR_" + Event_ID);
+        }
+        function fn_SelectGrandchild(parent_id, child_id, grandchild_id, range)
+        {
+            $('#myPleaseWait').modal('show');
+            setTimeout(function () {
+                var URL = "/Spec/GetEventsForGrandchild?Parent_ID=" + parent_id + "&Child_ID=" + child_id + "&Grandchild_ID=" + grandchild_id + "&Range=" + Range;
+                $.ajax({
+                    url: URL,
+                    async:false,
+                    type: "GET",
+                    dataType: "json",
+                    success: function (result) {
+                        var thing = "#TR_"+parent_id+'-'+child_id+'-'+grandchild_id;
+                        $(thing).css('background-color', 'lightblue');
+
+                        var EventsTable = $("#EventsTable").DataTable().destroy();
+                        $("#EventsTable tbody").empty();
+                        var vEventsCount = 0;
+                        var vUnsoldListings = 0;
+                        var vUnsoldTickets = 0;
+                        var vUnsoldPrice = 0;
+                        var vSoldListings = 0;
+                        var vSoldTickets = 0;
+                        var vSoldPrice = 0;
+                        jQuery.each(result, function(index, item) {
+                            vEventsCount += 1;
+                            if (vEventsCount == 1)
+                                $("#ModalTitle").text(item.Title);
+                            if(item.expired==false)
+                            {
+                                vUnsoldListings += item.UListings;
+                                vUnsoldTickets += item.UTickets;
+                                vUnsoldPrice += item.UPrice;
+                                vSoldListings += item.SListings;
+                                vSoldTickets += item.STickets;
+                                vSoldCost += item.SCost;
+                                vSoldPrice += item.SPrice;
+                                vSoldProfit += item.SProfit;
+                           }
+
+                            var NewRec = "<tr id=\"TR_"+item.event_id + "\" style=\"background-color:" + ((item.expired)?'pink':'white') + "\" onclick=\"fn_SelectEvent("+item.event_id+");\"><td>"+item.event_name+"</td>";
+                            NewRec += "<td>"+item.event_date+"</td>";
+                            NewRec += "<td>"+item.venue+"  "+item.city+","+item.state_short_name+"</td>";
+
+                            NewRec += "<td style=\"text-align:right; background-color:rgba(229,229,229,0.24);\"><a href=\"#\" title=\"Sold Listings: "+item.SListings+"\">"+item.UListings+"</a></td>";
+                            NewRec += "<td style=\"text-align:right; background-color:rgba(229,229,229,0.24);\"><a href=\"#\" title=\"Sold Tickets: "+item.STickets+"\">"+item.UTickets+"</a></td>";
+                            NewRec += "<td style=\"text-align:right; background-color:rgba(229,229,229,0.24);\"><a href=\"#\" title=\"Sold Cost: "+formatCurrency(item.SCost)+"\">"+formatCurrency(item.UCost)+"</a></td>";
+                            NewRec += "<td style=\"text-align:right; background-color:rgba(229,229,229,0.24);\"><a href=\"#\" title=\"Sold Price: "+formatCurrency(item.SPrice)+"\">"+formatCurrency(item.UPrice)+"</a></td>";
+                            NewRec += "<td style=\"text-align:right; background-color:rgba(229,229,229,0.24);\"><a href=\"#\" title=\"Sold Profit: "+formatCurrency(item.SProfit)+"\">"+formatCurrency(item.UProfit)+"</a></td>";
+                            NewRec += "<td style='text-align:right;'>"+Math.round(parseFloat(item.Sold) * 100)+"%</td>";
+                            NewRec += "<td style='text-align:right;'>"+Math.round(parseFloat(item.Priced) * 100)+"%</td>";
+                            NewRec += "<td style='text-align:right;'>"+Math.round(parseFloat(item.Shared) * 100)+"%</td>";
+                            NewRec += "<td>"+item.event_datetime+"</td></tr>";
+                            $("#EventsTable > tbody").append(NewRec);
+                            if(vEventsCount == 1)
+                                $("#ModalHeader").text(item.Desc);
+                        });
+                        $('#myPleaseWait').modal('hide');
+                        if ($("#EventsDiv").is(':hidden'))
+                        {
+                            $("#DTSearch").val("");
+                            $("#EventsDiv").modal('show');
+                            $("#DTSearch").focus();
+                        }
+                        var EventsTable = $('#EventsTable').DataTable({
+                            "destroy": true,
+                            "scrollY": '300px',
+                            "scrollCollapse": true,
+                            "paging": false,
+                            "searching": true,
+                            "autoWidth": true,
+                            "info": false,
+                            "columnDefs": [
+                                { targets: [11], visible: false },
+                                { iDataSort: 11, targets: [1] }
+                            ],
+                            "footerCallback": function (tfoot, data, start, end, display) {
+                                $(tfoot).find('th').eq(0).html(vEventsCount + " Events");
+                                $(tfoot).find('th').eq(1).html("<a href='#' style='color:white;' title='Sold Listings: "+vSoldListings+"'>"+vUnsoldListings+"</a>");
+                                $(tfoot).find('th').eq(2).html("<a href='#' style='color:white;' title='Sold Ticketss: "+vSoldTickets+"'>"+vUnsoldTickets+"</a>");
+                                $(tfoot).find('th').eq(3).html("<a href='#' style='color:white;' title='Sold Cost: "+formatCurrency(vSoldCost)+"'>"+formatCurrency(vUnsoldCost)+"</a>");
+                                $(tfoot).find('th').eq(4).html("<a href='#' style='color:white;' title='Sold Price: "+formatCurrency(vSoldPrice)+"'>"+formatCurrency(vUnsoldPrice)+"</a>");
+                                $(tfoot).find('th').eq(5).html("<a href='#' style='color:white;' title='Sold Profit: "+formatCurrency(vSoldProfit)+"'>"+formatCurrency(vUnsoldProfit)+"</a>");
+                            }
+                        });
+                        $('#DTSearch').on( 'keyup', function () {
+                            EventsTable.search( this.value ).draw();
+                        } );
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert('Get Events for Grandchild: ' + thrownError);
+                    }
+                });
+            }, 250);
+        }
+        function fn_SelectChild(parent_id, child_id, grandchild_id, grandchild)
+        {
+            if (grandchild == "-")
+                fn_SelectGrandchild(parent_id, child_id, grandchild_id);
+            else
+                $.ajax({
+                    url: "/Spec/UpdateValues?Type=Child&NewValue=" + child_id,
+                    async:false,
+                    type: "GET",
+                    success: function (response) {
+                        location.reload();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert('Update Child Error: ' + thrownError);
+                    }
+                });
+        }
+        function fn_SelectParent(parent_id)
+        {
+            $.ajax({
+                url: "/Spec/UpdateValues?Type=Parent&NewValue=" + parent_id,
+                async:false,
+                type: "GET",
+                success: function (response) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Update Parent Error: ' + thrownError);
+                }
+            });
+        }
+        function fn_UpdateRange()
+        {
+            var range = $("input[type='radio'][name='eventrange']:checked").val();
+            $.ajax({
+                url: "/Spec/UpdateValues?Type=Range&NewValue=" + range,
+                async:false,
+                type: "GET",
+                success: function (response) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Update Range Error: ' + thrownError);
+                }
+            });
+        }
+        function fn_ResetPage()
+        {
+            $.ajax({
+                url: "/Spec/UpdateValues?Type=Reset&NewValue=0",
+                async:false,
+                type: "GET",
+                success: function (response) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Reset Page Error: ' + thrownError);
+                }
+            });
+        }
+        $(document).ready(function () {
+            $(".NavBar").css("background-color", "");
+            $("#SP").css("background-color", "#353535");
+            if ($(window).width() > 1135) {
+                $("#IconBar2").show();
+                $("#wrapper").toggleClass("toggled");
+            } else
+                $("#IconBar").show();
+
+            if (Parent_ID != 0)
+            {
+                $("#firstsdiv").show();
+                $("#firstslink").text('@ViewBag.Parent');
+            }
+            if (Child_ID != 0)
+            {
+                $("#secondsdiv").show();
+                $("#secondslink").text('@ViewBag.Child');
+            }
+
+            $('input:radio[name="eventrange"][value='+Range+']').attr('checked',true);
+
+            $("#SearchWrapper7").show();
+            $("#LoginWrapper").show();
+            $("#InventoryDiv").show();
+            var InventoryTable = $('#InventoryTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "scrollY": '70vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "order": [[ 0, "asc" ]],
+                "columnDefs": [
+                    { targets: [9], visible: false },
+                    { iDataSort: 9, targets: [6] },
+                ],
+            });
+            setTimeout(function () {
+                InventoryTable.draw();
+            }, 250);
+            window.onresize = function() {
+                InventoryTable.columns.adjust().draw();
+            }
+        });
+    </script>
+}
+<div id="MyDashboardWrapper">
+    <div id="InventoryDiv" style="width:97%; background-color:transparent; margin-top:0px; float:left; display:none;">
+        <table id="InventoryTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+            <thead>
+                <tr class="TableTr">
+                    <th style="text-align:center;">Parent</th>
+                    <th style="text-align:center;">Child</th>
+                    <th style="text-align:center;">Grandchild</th>
+                    <th style="text-align:center;">Events</th>
+                    <th style="text-align:center;">Listings</th>
+                    <th style="text-align:center;">Qty</th>
+                    <th style="text-align:center;">Price</th>
+                    <th style="text-align:center;">Priced</th>
+                    <th style="text-align:center;">Shared</th>
+                    <th>price2</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr id="TR_@item.event_parent_category_id-@item.event_child_category_id-@item.event_grandchild_category_id">
+                        <td><a href="#" style="margin-left:4px;" class="TableLink" title="Click to filter to @item.event_parent_category_desc" onclick="fn_SelectParent(@item.event_parent_category_id);">@item.event_parent_category_desc</a></td>
+                        <td><a href="#" style="margin-left:4px;" class="TableLink" title="Click to filter to @item.event_child_category_desc" onclick="fn_SelectChild(@item.event_parent_category_id, @item.event_child_category_id, @item.event_grandchild_category_id, '@item.event_grandchild_category_desc');">@item.event_child_category_desc</a></td>
+                        <td><a href="#" style="margin-left:4px;" class="TableLink" title="Click to filter to @item.event_grandchild_category_desc" onclick="fn_SelectGrandchild(@item.event_parent_category_id, @item.event_child_category_id, @item.event_grandchild_category_id);">@item.event_grandchild_category_desc</a></td>
+                        <td style="background-color:@((item.ExpiredEvents>0)?"pink":"rgba(229,229,229, 0.48)"); text-align:right;"><a href="#" title=@((item.ExpiredEvents>0)?item.ExpiredEvents+ "Expired": "")>@item.Events</a></td>
+                        <td style="background-color:rgba(229,229,229, 0.48); text-align:right;"><a href="#" title="Sold Listings: @String.Format("{0:###,###}", item.SListings)">@String.Format("{0:###,###}", item.UListings)</a></td>
+                        <td style="background-color:rgba(229,229,229, 0.48); text-align:right;"><a href="#" title="Sold Tickets: @String.Format("{0:###,###}", item.STickets)">@String.Format("{0:###,###}", item.UTickets)</a></td>
+                        <td style="background-color:rgba(229,229,229, 0.48); text-align:right;"><a href="#" title="Sold Price: @String.Format("{0:c}", item.SPrice)">@String.Format("{0:c}", item.UPrice)</a></td>
+                        <td style="text-align:right;"><a href="#" title="Percentage Priced">@String.Format("{0:P0}", item.Priced)</a></td>
+                        <td style="text-align:right;"><a href="#" title="Percentage Shared">@String.Format("{0:P0}", item.Shared)</a></td>
+                        <td>@item.UPrice</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr style="border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                    <th colspan="3"><label style="width:47px;height:16px;font-size:12px;font-weight:900;line-height:1.33;letter-spacing:0.5px;  color: #ffffff;">Totals</label></th>
+                    <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:###,###}", ViewBag.TotalEvents) </th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><a href="#" style="color:white;" title="Total Sold Listings: @String.Format("{0:###,###}", ViewBag.TotalSListings)">@String.Format("{0:###,###}", ViewBag.TotalUListings)</a></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><a href="#" style="color:white; " title="Total Sold Tickets: @String.Format("{0:###,###}", ViewBag.TotalSTickets)">@String.Format("{0:###,###}", ViewBag.TotalUTickets)</a></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><a href="#" style="color:white;" title="Total Sold Price: @String.Format("{0:c}", ViewBag.TotalSPrice)">@String.Format("{0:c}", ViewBag.TotalUPrice)</a></th>
+                    <th colspan="3"></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+<div class="modal loadingModal" id="EventsDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px; width:90%; max-width:90%;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div class="modal-footer" style="float:left;">
+                    <input id="DTSearch" style="width:150px; margin-top:-12px; font-size:12pt;" placeholder="Search" />
+                    <label id="ModalTitle" style="font-size:40px; color:white; margin-top:-5px;"></label>
+                </div>
+                <div class="modal-footer" style="float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_CloseAdvancedSearch()">Close</button>
+                </div>
+            </div>
+            <div class="modal-body" style="width:100%; margin:auto;">
+                <table id="EventsTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                    <thead>
+                        <tr class="TableTr">
+                            <th style="text-align:center;">Event</th>
+                            <th style="text-align:center;">Date</th>
+                            <th style="text-align:center;">Venue</th>
+                            <th style="text-align:center;">Listings</th>
+                            <th style="text-align:center;">Qty</th>
+                            <th style="text-align:center;">Price</th>
+                            <th style="text-align:center;">Priced</th>
+                            <th style="text-align:center;">Shared</th>
+                            <th style="text-align:center;">Date2</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr style="border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th colspan="3" style="background-color: rgb(53,53,53); color:white;"><label style="width:47px;height:16px;font-size:12px;font-weight:900;line-height:1.33;letter-spacing:0.5px;"></label></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th></th>
+                            <th></th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,465 @@
+﻿
+
+@model IEnumerable<spGet_POList_Result>
+@{
+    ViewBag.Title = "PO List";
+}
+@section scripts {
+    <script type="text/javascript">
+        var vStartDate5 = "@Session["StartDate5"]";
+        var vEndDate5 = "@Session["EndDate5"]";
+        var vAllDates = "@Session["AllDates5"]";
+
+        var vEventOnly = "@Session["EventOnly5"]";
+        var vVendorOnly = "@Session["VendorOnly5"]";
+        var vAgentOnly = "@Session["AgentOnly5"]";
+        var vVoidsOnly = "@Session["VoidsOnly5"]";
+
+        var vSearch = "@Session["Search5"]";
+      
+        function fn_SelectEvent(Source, Event_ID, PO, Event_Count) {
+            if (PO == 0 && Event_Count > 1)
+                alert('Multiple event without PO filter not allowed!');
+            else {
+                $("#" + Source).css('background-color', 'lightblue');
+                if (Event_Count == 1) {
+                    var Url = "../Inventory/Index?Event_ID=" + Event_ID + "&PO_ID=" + PO;
+                    launchApplication(Url, Source);
+                } else {
+                    $('#myPleaseWait').modal('show');
+                    setTimeout(function () {
+
+                        var vPODate = $("#" + "PODate_" + PO).text();
+                        var vUser = $("#" + "User_" + PO).text();
+                        var vSQ = $("#SQ_" + PO).text();
+                        var vSC = $("#SC_" + PO).text();
+                        var vHQ = $("#HQ_" + PO).text();
+                        var vVP = $("#VP_" + PO).text();
+                        var vPR = $("#PR_" + PO).text();
+                        var vTQ = $("#TQ_" + PO).text();
+                        var vPS = $("#PS_" + PO).text();
+                        var vUQ = $("#UQ_" + PO).text();
+                        var vUC = $("#UC_" + PO).text();
+                        var vHP = $("#HP_" + PO).text();
+                        var vVC = $("#VC_" + PO).text();
+                        var vPP = $("#PP_" + PO).text();
+                        var vTP = $("#TP_" + PO).text();
+                        var vAP = $("#AP_" + PO).text();
+                        var URL = "../Purchase/Search2?PO_ID=" + PO;
+                        $.ajax({
+                            type: "GET",
+                            cache: false,
+                            aysnc: false,
+                            url: URL,
+                            success: function (result) {
+                                var MultiTable = $("#MultiTable").DataTable().destroy();
+                                $("#MultiTable tbody").empty();
+                                var EventCount = 0;
+                                $.each(result, function (key, value) {
+                                    var NewRec = "<tr onclick=\"fn_SelectEvent('POList_" + value.PO_ID + "', " + value.Event_ID + ", " + value.PO_ID + ", 1);\">";
+                                    NewRec += "<td><div class=\"TableText1\"><a href=\"#\" title=\""+value.Broker_Name+"\">"+value.Broker_Company+"</a></div></td>";
+                                    NewRec += "<td><a href=\"#\" class=\"TableLink\" title=\"Click to open Event Page\" >"+value.Event_Name+"</a></td>";
+                                    NewRec += "<td><div class=\"TableText1\"><a href=\"#\" title=\"Event Date\">"+value.Event_Date+"</a></div><div class=\"TableText2\"><a href=\"#\" title=\"Venue Info\">"+value.Venue+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Sold Qty\">"+value.Sold+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Unsold Qty\">"+value.Unsold+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Sold Cost\">"+formatCurrency(value.SoldCost)+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Unsold Cost\">"+formatCurrency(value.UnsoldCost)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Shared Qty\">"+value.Shared+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Shared Price\">"+formatCurrency(value.SharedPrice)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Avg Price\">"+formatCurrency(value.AvgPrice)+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Avg Cost\">"+formatCurrency(value.AvgCost)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Current Profit\">"+formatCurrency(value.Profit)+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Projected Profit\">"+formatCurrency(value.ProjProfit)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Total Qty\">"+value.TotalQty+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Total Profit\">"+formatCurrency(value.TotalProfit)+"</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"% Sold\">"+value.PercentSold+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"Profit Margin\">"+value.Margin+"%</a></div></td>";
+                                    NewRec += "<td style=\"background-color:rgba(229,229,229, 0.48);\"><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"SH Qty\">"+value.SHQty+"</a></div><div class=\"TableText1\" style=\"text-align:right\"><a href=\"#\" title=\"ROC\">"+value.ROC+"</a></div></td>";
+                                    NewRec += "<td>"+value.Event_Date2+"</td>";
+                                    NewRec += "<td>"+value.PO_Date2+"</td></tr>";
+                                    $("#MultiTable > tbody").append(NewRec);
+                                    EventCount += 1;
+                                })
+                                $("#ModalPOHeader").text("PO: " + PO + "  ON:" + vPODate + "  BY:" + vUser);
+                                $("#FooterTitle").text(+EventCount + " events");
+                                $("#FooterSQ").text(vSQ);
+                                $("#FooterSC").text(vSC);
+                                $("#FooterHQ").text(vHQ);
+                                $("#FooterVP").text(vVP);
+                                $("#FooterPR").text(vPR);
+                                $("#FooterTQ").text(vTQ);
+                                $("#FooterPS").text(vPS);
+                                $("#FooterUQ").text(vUQ);
+                                $("#FooterUC").text(vUC);
+                                $("#FooterHP").text(vHP);
+                                $("#FooterVC").text(vVC);
+                                $("#FooterPP").text(vPP);
+                                $("#FooterTP").text(vTP);
+                                $("#FooterAP").text(vAP);
+                                $("#MultiDiv").modal('show');
+                                var MultiTable = $('#MultiTable').DataTable({
+                                    "ordering": true,
+                                    "scrollY": '60vh',
+                                    "scrollX": false,
+                                    "scrollCollapse": true,
+                                    "paging": false,
+                                    "searching": false,
+                                    "info": false,
+                                    "columnDefs": [
+                                        { targets: [11, 12], visible: false },
+                                        { iDataSort: 12, targets: [1] },
+                                        { iDataSort: 11, targets: [5] }
+                                    ]
+                                });
+                                setTimeout(function () {
+                                    MultiTable.draw();
+                                }, 250);
+                                $('#myPleaseWait').modal('hide');
+                            },
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                $('#myPleaseWait').modal('hide');
+                                alert("Error: Displaying MultiPO /" + thrownError);
+                            }
+                        });
+                    }, 500);
+                }
+            }
+        }
+        function launchApplication(l_url, l_windowName) {
+            if (typeof launchApplication.winRefs == 'undefined') {
+                launchApplication.winRefs = {};
+            }
+            if (typeof launchApplication.winRefs[l_windowName] == 'undefined' || launchApplication.winRefs[l_windowName].closed) {
+                var l_width = screen.availWidth;
+                var l_height = screen.availHeight;
+
+                var l_params = 'status=1' +
+                               ',resizable=1' +
+                               ',scrollbars=1' +
+                               ',width=' + l_width +
+                               ',height=' + l_height +
+                               ',left=0' +
+                               ',top=0';
+
+                launchApplication.winRefs[l_windowName] = window.open(l_url, l_windowName);//, l_params);
+                launchApplication.winRefs[l_windowName].moveTo(0, 0);
+                launchApplication.winRefs[l_windowName].resizeTo(l_width, l_height);
+            } else {
+                launchApplication.winRefs[l_windowName].focus()
+            }
+        }
+        function fn_SelectPO(PO) {
+            var w = 860;
+            var h = 900;
+            var URL = "../Purchase/GetPO?PO_ID=" + PO;
+            popupWindow(URL, "PO", w, h);
+        }
+        function fn_EnterSearch5() {
+            $('#SearchBox5').select();
+        }
+        function doDelayedSearch5(e) {
+            if (e.key == 'Enter')
+                fn_Search(); //this is your existing function
+        }
+        function fn_ChangeStart5(){
+            var StartDate = $("#StartDate5").val();
+            var SD = Date.parse(StartDate);
+            var EndDate = $("#EndDate5").val();
+            var ED = Date.parse(EndDate);
+            if(SD > ED)
+                $("#EndDate5").val(StartDate);
+            fn_Search();
+        }
+        function fn_ChangeEnd5(){
+            var StartDate = $("#StartDate5").val();
+            var SD = Date.parse(StartDate);
+            var EndDate = $("#EndDate5").val();
+            var ED = Date.parse(EndDate);
+            if(SD > ED)
+                $("#StartDate5").val(EndDate);
+            fn_Search();
+        }
+        function fn_Search(){
+            $('#myPleaseWait').modal('show');
+            var vBegin = $("#StartDate5").val();
+            var vEnd = $("#EndDate5").val();
+            var vAllDates = $("#AllDates").prop("checked");
+
+            var vEventOnly = $("#EventOnly").prop("checked");
+            var vVendorOnly = $("#VendorOnly").prop("checked");
+            var vAgentOnly = $("#AgentOnly").prop("checked");
+            var vVoidsOnly = $("#VoidsOnly").prop("checked");
+
+            var vSearch = $("#SearchBox5").val();
+
+            var URL = "../Purchase/UpdateValues";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Begin: vBegin,
+                    End: vEnd,
+                    AllDates: vAllDates,
+
+                    EventOnly: vEventOnly,
+                    VendorOnly: vVendorOnly,
+                    AgentOnly: vAgentOnly,
+                    VoidsOnly: vVoidsOnly,
+
+                    Search: vSearch
+                },
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Values  /" + thrownError);
+                }
+            });
+
+        }
+        function fn_ResetPage() {
+            var URL = "../Purchase/UpdateValues";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Begin: "NULL",
+                    End: "NULL",
+                    AllDates: false,
+
+                    EventOnly: false,
+                    VendorOnly: false,
+                    AgentOnly: false,
+                    VoidsOnly: false,
+
+                    Search: ""
+                },
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Values  /" + thrownError);
+                }
+            });
+        }
+        function fn_UpdateAD() {
+            $("#PageReset").show();
+            var Checked = $("#AllDates").prop("checked");
+            if (Checked)
+            {
+                $("#StartDate5").css("background-color", "lightgrey");
+                $("#EndDate5").css("background-color", "lightgrey");
+                $("#StartDate5").prop("disabled", true);
+                $("#EndDate5").prop("disabled", true);
+            } else {
+                $("#StartDate5").prop("disabled", false);
+                $("#EndDate5").prop("disabled", false);
+                $("#StartDate5").css("background-color", "white");
+                $("#EndDate5").css("background-color", "white");
+            }
+            if ($("#SearchBox5").val().length > 0)
+                fn_Search();
+        }
+        function fn_UpdateOnly(type) {
+            $("#PageReset").show();
+            if (type == "VoidsOnly")
+                fn_Search();
+            else
+            {
+                var Checked = $("#" + type).prop("checked");
+                if (Checked) {
+                    if (type == "EventOnly") {
+                        $("#VendorOnly").prop("checked", false);
+                        $("#AgentOnly").prop("checked", false);
+                    }
+                    if (type == "VendorOnly") {
+                        $("#EventOnly").prop("checked", false);
+                        $("#AgentOnly").prop("checked", false);
+                    }
+                    if (type == "AgentOnly") {
+                        $("#EventOnly").prop("checked", false);
+                        $("#VendorOnly").prop("checked", false);
+                    }
+                }
+                if ($("#SearchBox5").val().length > 0)
+                    fn_Search();
+            }
+        }
+        $(document).ready(function () {
+            $(".NavBar").css("background-color", "");
+            $("#PO").css("background-color", "#353535");
+            if ($(window).width() > 1135) {
+                $("#IconBar2").show();
+                $("#wrapper").toggleClass("toggled");
+            } else
+                $("#IconBar").show();
+            $("#SearchWrapper5").show();
+            $("#StartDate5").val(vStartDate5);
+            $("#EndDate5").val(vEndDate5);
+
+            if (vEventOnly == "true")
+                $("#EventOnly").prop('checked', true);
+            if (vVendorOnly == "true")
+                $("#VendorOnly").prop('checked', true);
+            if (vAgentOnly == "true")
+                $("#AgentOnly").prop('checked', true);
+            if (vVoidsOnly == "true")
+                $("#VoidsOnly").prop('checked', true);
+
+            if (vSearch.length > 0)
+                $("#SearchBox5").val(vSearch);
+            if (vAllDates == "true") {
+                $("#AllDates").prop('checked', true);
+                $("#StartDate5").css("background-color", "lightgrey");
+                $("#EndDate5").css("background-color", "lightgrey");
+                $("#StartDate5").prop("disabled", true);
+                $("#EndDate5").prop("disabled", true);
+            }
+            
+            if ("@ViewBag.Changed" == "True")
+                $("#PageReset").show();
+           
+            $("#LoginWrapper").show();
+            $('#PODiv').show();
+            var POTable = $('#POTable').DataTable({
+                "ordering": true,
+                "scrollY": '60vh',
+                "scrollX": false,
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "columnDefs": [
+                    { targets: [14,15], visible: false },
+                    { iDataSort: 15, targets: [1] },
+                    { iDataSort: 14, targets: [5] }
+                ]
+            });
+            setTimeout(function () {
+                POTable.draw();
+            }, 250);
+            window.onresize = function() {
+                POTable.columns.adjust().draw();
+            }
+            $('#myPleaseWait').modal('hide');
+        });
+</script>
+}
+
+<div id="MyDashboardWrapper">
+    <div id="PODiv" style="width:97%; background-color:transparent; margin-top:0px; float:left; display:none;">
+        <table id="POTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+            <thead>
+                <tr class="TableTr">
+                    <th>PO</th>
+                    <th>PO Date</th>
+                    <th>Status</th>
+                    <th>Vendor</th>
+                    <th>Event</th>
+                    <th>Event&nbsp;Date</th>
+                    <th>Sec/Row</th>
+                    <th style="background-color: rgb(53,53,53); color:white; text-align:right;">Qty</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Cost</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Price</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Profit</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Total</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Stats</th>
+                    <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Avg</th>
+                    <th>EventDate2</th>
+                    <th>PODate2</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                   {
+                    <tr id="POList_@item.PO_ID" style="background-color:@((item.Status=="Void")?"Lightgrey":"White")">
+                        <td class="TableTr"><a href="#" style="margin-left:4px;" class="TableLink" title="Click to open PO Page" onclick="fn_SelectPO(@item.PO_ID);">@item.PO_ID</a></td>
+                        <td><div class="TableText2"><a href="#" id="PODate_@item.PO_ID" title="PO Date">@item.PO_Date</a></div><div class="TableText1"><a href="#" id="User_@item.PO_ID" title="User Name">@item.User_Name</a></div></td>
+                        <td><a href="#" id="Status_@item.PO_ID" title="@item.notes">@item.Status</a></td>
+                        <td><div class="TableText1"><a href="#" title="@item.Broker_Name">@item.Broker_Company</a></div></td>
+                        <td><a href="#" class="TableLink" title="Click to open Event Page" onclick="fn_SelectEvent('POList_@item.PO_ID', @item.Event_ID, @item.PO_ID, @item.Event_Count);">@item.Event_Name</a></td>
+                        <td><div class="TableText1"><a href="#" title="Event Date">@item.Event_Date</a></div><div class="TableText2"><a href="#" title="Venue Info">@item.Venue</a></div></td>
+                        <td><div class="TableText1"><a href="#" title="Section">@item.Section</a></div><div class="TableText2"><a href="#" title="Row">@item.Row</a></div></td>
+                        <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="UQ_@item.PO_ID" title="Unsold Qty">@item.Unsold</a></div><div class="TableText1" style="text-align:right"><a href="#" id="SQ_@item.PO_ID" title="Sold Qty">@item.Sold</a></div></td>
+                        <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="UC_@item.PO_ID" title="Unsold Cost">@String.Format("{0:c}", item.UnsoldCost)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="SC_@item.PO_ID" title="Sold Cost">@String.Format("{0:c}", item.SoldCost)</a></div></td>
+                        <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="UP_@item.PO_ID" title="Unsold Price">@String.Format("{0:c}", item.UnsoldPrice)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="SP_@item.PO_ID" title="Sold Price">@String.Format("{0:c}", item.SoldPrice)</a></div></td>
+                        <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="VP_@item.PO_ID" title="Current Profit">@String.Format("{0:c}", item.Profit)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="VC_@item.PO_ID" title="Projected Profit">@String.Format("{0:c}", item.ProjProfit)</a></div></td>
+                        <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="PR_@item.PO_ID" title="Total Quantity">@item.TotalQty</a></div><div class="TableText1" style="text-align:right"><a href="#" id="PP_@item.PO_ID" title="Total Price">@String.Format("{0:c}", item.TotalPrice)</a></div></td>
+                        <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="TQ_@item.PO_ID" title="% Sold (Not Counting Write Off)">@String.Format("{0:P}",item.PercentSold)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="TP_@item.PO_ID" title="Margin">@String.Format("{0:P}",item.Margin)</a></div></td>
+                        <td style="background-color:rgba(229,229,229, 0.48);"><div class="TableText1" style="text-align:right"><a href="#" id="PS_@item.PO_ID" title="Agerage Price">@String.Format("{0:c}", item.AvgPrice)</a></div><div class="TableText1" style="text-align:right"><a href="#" id="AP_@item.PO_ID" title="Average Cost">@String.Format("{0:c}", item.AvgCost)</a></div></td>
+                        <td>@item.Event_Date2</td>
+                        <td>@item.PO_Date2</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr style="border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                    <th colspan="7"><label style="width:47px;height:16px;font-size:12px;font-weight:900;line-height:1.33;letter-spacing:0.5px;  color: #ffffff;">&nbsp;&nbsp;@ViewBag.FooterTitle</label></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Unsold Qty" style="color:white;">@ViewBag.UnsoldQty</a></div><a href="#" title="Sold Qty" style="color:white;">@ViewBag.SoldQty</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Unsold Cost" style="color:white;">@ViewBag.UnsoldCost</a></div><a href="#" title="Sold Cost" style="color:white;">@ViewBag.SoldCost</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Unsold Price" style="color:white;">@ViewBag.UnsoldPrice</a></div><a href="#" title="Sold Price" style="color:white;">@ViewBag.SoldPrice</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Current Profit" style="color:white;">@ViewBag.Profit</a></div><a href="#" title="Projected Profit" style="color:white;">@ViewBag.ProjectedProfit</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Total Qty" style="color:white;">@ViewBag.TotalQty</a></div><a href="#" title="Total Revenue" style="color:white;">@ViewBag.TotalRevenue</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Percent Sold" style="color:white;">@ViewBag.PercentSold</a></div><a href="#" title="Margin" style="color:white;">@ViewBag.Margin</a><div></div></th>
+                    <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" title="Avg Price" style="color:white;">@ViewBag.AvgPrice</a></div><a href="#" title="Avg Cost" style="color:white;">@ViewBag.AvgCost</a><div></div></th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+<!-- Modal Starts here-->
+<div class="modal loadingModal" id="MultiDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px; width:90%; max-width:90%;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div class="modal-footer" style="float:left;">
+                    <h1 id="ModalPOHeader" style="color:white; margin-top:2px;"></h1>
+                </div>
+                <div class="modal-footer" style="float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_CloseAdvancedSearch()">Close</button>
+                </div>
+            </div>
+            <div class="modal-body" style="width:100%; margin:auto;">
+                <table id="MultiTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                    <thead>
+                        <tr class="TableTr">
+                            <th>Vendor</th>
+                            <th>Event</th>
+                            <th>Event&nbsp;Date</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;">Qty</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Cost</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Shared</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Average</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Profit</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Totals</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">Stats</th>
+                            <th style="background-color: rgb(53,53,53);  color:white;text-align:right;">SH&nbsp;Stats</th>
+                            <th>EventDate2</th>
+                            <th>PODate2</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr style="border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th colspan="3"><label id="FooterTitle" style="width:47px;height:16px;font-size:12px;font-weight:900;line-height:1.33;letter-spacing:0.5px;  color: #ffffff;"></label></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterSQ" title="Sold Qty" style="color:white;"></a></div><a href="#" id="FooterUQ" title="Unsold Qty" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterSC" title="Sold Cost" style="color:white;"></a></div><a href="#" id="FooterUC" title="Unsold Cost" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterHQ" title="Shared Qty" style="color:white;"></a></div><a href="#" id="FooterHP" title="Shared Price" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterVP" title="Avg Price" style="color:white;"></a></div><a href="#" id="FooterVC" title="Avg Cost" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterPR" title="Profit" style="color:white;"></a></div><a href="#" id="FooterPP" title="Projected Profit" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterTQ" title="Total Qty" style="color:white;"></a></div><a href="#" id="FooterTP" title="Total Profit" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"><div><a href="#" id="FooterPS" title="% Sold" style="color:white;"></a></div><a href="#" id="FooterAP" title="Available Price" style="color:white;"></a><div></div></th>
+                            <th style="background-color: rgb(53,53,53); text-align:right;"></th>
+                            <th></th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+

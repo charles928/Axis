@@ -1,0 +1,1579 @@
+﻿@{
+    ViewBag.Title = "Sales";
+}
+@section scripts {
+    <style type="text/css">
+         .shortIcon {
+            position: absolute;
+            height: 75px;
+            top: 10px;
+            width: 100px;
+        }
+
+        img.shortIcon.clear {
+            width: 70px;
+            height: 70px;
+            top: 10px;
+        }
+
+        img.shortIcon {
+            position: absolute;
+            bottom: 0;
+            width: 100px;
+            height: 100px;
+        }
+    </style>
+    <script type="text/javascript">
+        var AvailableTable;
+        var CustomerTable;
+        var CartTable;
+        var PayTable;
+
+        var Invoice_ID = 0;
+        var Customer_ID = 0;
+        var CustomerType = 'Broker';
+        var vSearch = "";
+        var EventName;
+        var EventDate;
+        var EventVenue;
+        var Taxable;
+        var Type;
+        function fn_DisplayInvoice() {
+            var w = 860;
+            var h = 900;
+            var URL = "../Invoice/GetInvoice?Invoice_ID=" + Invoice_ID + "&AutoPrint=false";
+            popupWindow(URL, Invoice_ID, w, h);
+        }
+        function fn_ResetPage() {
+            location.reload();
+        }
+        function fn_FinishSale() {
+            //this is for once the balance on an invoice becomes $0
+            fn_DisplayInvoice();
+            setTimeout(function () {
+                fn_ResetPage();
+            }, 250);
+        }
+        function fn_UpdateCustomer() {
+            // add/update customer
+            var btCompany = $("#BTCompany").val();
+            var btFirst = $("#BTFirst").val();
+            var btLast = $("#BTLast").val();
+            var btAddress1 = $("#BTAddress1").val();
+            var btAddress2 = $("#BTAddress2").val();
+            var btCity = $("#BTCity").val();
+            var btState_ID = $("#BTState").val();
+            var btZip = $("#BTZip").val();
+            var btCountry_ID = $("#BTCountry").val();
+            var btEmail = $("#BTEmail").val();
+            var btPhone = $("#BTPhone").val();
+            var btTaxExempt = $("#TaxExempt").prop('checked');
+            var URL = "../Sales/UpdateCustomer";
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                data: {
+                    Customer_ID: Customer_ID,
+                    CustomerType: CustomerType,
+                    Company: btCompany,
+                    First: btFirst,
+                    Last: btLast,
+                    Address1: btAddress1,
+                    Address2: btAddress2,
+                    City: btCity,
+                    State: btState_ID,
+                    Zip: btZip,
+                    Country: btCountry_ID,
+                    Email: btEmail,
+                    Phone: btPhone,
+                    TaxExempt: btTaxExempt
+                },
+                success: function (result) {
+                    Customer_ID = result;
+                    fn_HoldItems();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Customer /" + thrownError);
+                }
+            });
+        }
+        function fn_HoldItems() {
+            var ExternalNotes = $("#InvoiceNotes").val();
+            var ShippingType_ID = $("#ShippingList").val();
+            var ItemsToHold = "";
+            var URL = "../Sales/HoldSeats";
+            $('#CartTable TBODY TR').each(function () {
+                var Listing_ID = 0;
+                Listing_ID = this.id.replace("Cart_", "");
+                if (Listing_ID > 0) {
+                    var Qty = $("#CQty_" + Listing_ID).val();
+                    var Price = $("#CPrice_" + Listing_ID).val().replace("$", "").replace(",", "");
+                    NewItem = "~" + Listing_ID + "|" + Qty + "|" + Price;
+                    ItemsToHold += NewItem;
+                }
+            });
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                data: {
+                    Customer_ID: Customer_ID,
+                    CustomerType: CustomerType,
+                    ExternalNotes: ExternalNotes,
+                    Shippingtype_ID: ShippingType_ID,
+                    Items: ItemsToHold
+                },
+                success: function (result) {
+                    if (result != "") {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error Holding Items: " + result);
+                    } else {
+                        Hold_ID = result.Hold_ID
+                        fn_AddPaymentPart2();
+                    }
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Holding Items /" + thrownError);
+                }
+            });
+        }
+        function fn_AddPayment() {
+            if (Invoice_ID == 0) { //No invoice yet
+                var BTFirst = $("#BTFirst").val();
+                var BTLast = $("#BTLast").val();
+                var BTAddress1 = $("#BTAddress1").val();
+                var BTCity = $("#BTCity").val();
+                var BTState = $("#BTState").val();
+                var BTZip = $("#BTZip").val();
+                var BTCountry = $("#BTCountry").val();
+                var BTPhone = $("#BTPhone").val();
+                if (BTFirst == "" || BTLast == "" || BTAddress1 == "" || BTCity == "" || BTState == "0" || BTZip == "" || BTCountry == "0" || BTPhone == "") {
+                    alert("All Bill To inputs shadded yellow require a value.  Please correct Bill To information before paying.")
+                    $("#BTCompany").focus();
+                } else {
+                    var STFirst = $("#STFirst").val();
+                    var STLast = $("#STLast").val();
+                    var STAddress1 = $("#STAddress1").val();
+                    var STCity = $("#STCity").val();
+                    var STState = $("#STState").val();
+                    var STZip = $("#STZip").val();
+                    var STCountry = $("#STCountry").val();
+                    var STPhone = $("#STPhone").val();
+                    if (STFirst == "" || STLast == "" || STAddress1 == "" || STCity == "" || STState == "0" || STZip == "" || STCountry == "0" || STPhone == "") {
+                        alert("All Ship To inputs shadded yellow require a value.  Please correct Bill To information before paying.")
+                        $("#STCompany").focus();
+                    } else {
+                        var Amt = $("#PayAmt").val().replace("$", "").replace(",", "");
+                        var Balance = $("#CartBalance").val().replace("$", "").replace(",", "");
+                        if (parseFloat(Amt) > parseFloat(Balance)) {
+                            alert('Payment cannot exceede balance.')
+                            $("#PayAmt").focus();
+                            $("#PayAmt").select();
+                        } else {
+                            if (Amt == 0) {
+                                alert("Amount must be greater than $0.00");
+                                $("#PayAmt").focus();
+                                $("#PayAmt").select();
+                            } else
+                                fn_UpdateCustomer();
+                        }
+                    }
+                }
+            } else {
+                fn_AddPaymentPart2();
+            }
+        }
+        function fn_AddPaymentPart2() {
+            //Displays payment screen
+            var Amt = $("#PayAmt").val().replace("$", "").replace(",", "");
+            var Type = $("#PayTypeList option:selected").text();
+            var Type_ID = $("#PayTypeList").val();
+            if (parseFloat(Amt) > 0) {
+                $("#PayAmt").val(formatCurrency(Amt));
+
+                if (Type_ID == 1) //Credit Card
+                {
+                    $("#CCPopupDiv").modal('show');
+                    var CardName = $("#BTFirst").val() + ' ' + $("#BTLast").val();
+                    $("#CardName").val(CardName);
+                } else {
+                    if (Type_ID == 13) //Check--GetCheckNumber
+                    {
+                        $("#CheckPopupDiv").modal('show');
+                        $("#CheckNumber").val('');
+                        $("#CheckNumber").focus();
+                    } else {
+                        $("#PayNotePopupDiv").modal('show');
+                        $("#PayNote").val('');
+                        $("#PayNote").focus();
+                    }
+                }
+            }
+        }
+        function fn_AddPaymentPart3(PayType_ID, PayType, PayAmt, PayNote, AuthCode) {
+            var URL = "../Sales/AddPayment";
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                data: {
+                    Invoice_ID: Invoice_ID,
+                    PayType_ID: PayType_ID,
+                    PayAmt: PayAmt,
+                    PayNote: PayNote,
+                    AuthCode: AuthCode
+                },
+                success: function (result) {
+                    PayTable.destroy();
+                    var NewRec = "<tr id=\"Cart_" + PayType_ID + "\"><td>" + PayType + "</td>";
+                    NewRec += "<td>" + PayNote + "</td>";
+                    NewRec += "<td style='text-align:right;' class='PAmt'>" + formatCurrency(PayAmt) + "</td></tr>";
+                    $("#PayTable > tbody").append(NewRec);
+                    $("#PayTable").append();
+                    PayTable = $("#PayTable").DataTable({
+                        "destroy": true,
+                        "ordering": false,
+                        "scrollY": '100px',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "autowidth": true,
+                    })
+                    $("#PayTypeList").val(1);
+                    $("#PayAmt").val("$0.00");
+                    $('#myPleaseWait').modal('hide');
+                    fn_CartTotal();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Adding Payment /" + thrownError);
+                }
+            });
+        }
+        function fn_ChargeCard() {
+            var URL = "../Sales/ChargeCard";
+            $('#myPleaseWait').modal('show');
+            var CCType = $("#CCType option:selected").text();
+            var CardNumber = $("#CardNumber").val();
+            var PayAmt = $("#PayAmt").val().replace("$", "").replace(",", "");
+            var ExpMonth = $("#CCMonth").val();
+            var ExpYear = $("#CCYear").val()
+            var Name = $("#CardName").val();
+            var Address = $("#BTAddress1").val();
+            var City = $("#BTCity").val();
+            var State = $("#BTState option:selected").text();
+            var Zip = $("#BTZip").val();
+            var Country_ID = $("#BTCountry").val();
+            var CVV = $("#CVVNumber").val();
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                data: {
+                    CardType: CCType,
+                    CardNumber: CardNumber,
+                    PayAmount: PayAmt,
+                    ExpMonth: ExpMonth,
+                    ExpYear: ExpYear,
+                    Name: Name,
+                    Address: Address,
+                    City: City,
+                    State: State,
+                    Zip: Zip,
+                    Country_ID: Country_ID,
+                    CVV: CVV
+                },
+                success: function (result) {
+                    if (result.substr(0, 4) =="Axis")
+                    {
+                        if (Invoice_ID == 0)
+                        {
+                            fn_CompleteSale(20, CCType, PayAmt, result, result.AuthCode);
+                        } else {
+                            fn_AddPaymentPart3(20, CCType, PayAmt, result, result.AuthCode);
+                        }
+                    }
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Charging Card /" + thrownError);
+                }
+            });
+        }
+        function fn_AddCheckNumber() {
+            var PayTypeID = $("#PayTypeList").val();
+            var PayType = $("#PayTypeList option:selected").text()
+            var PayAmt = $("#PayAmt").val().replace("$", "").replace(",", "");
+            var PayNote = $("#CheckNumber").val();
+            $("#CheckPopupDiv").modal('hide');
+            $('#myPleaseWait').modal('show');
+            if (Invoice_ID == 0)
+                fn_CompleteSale(PayTypeID, PayType, PayAmt, PayNote);
+            else
+                fn_AddPaymentPart3(PayTypeID, PayType, PayAmt, PayNote, "");
+        }
+        function fn_AddPayNote() {
+            var PayTypeID = $("#PayTypeList").val();
+            var PayType = $("#PayTypeList option:selected").text()
+            var PayAmt = $("#PayAmt").val().replace("$", "").replace(",", "");
+            var PayNote = $("#PayNote").val();
+            $("#PayNotePopupDiv").modal('hide');
+            $('#myPleaseWait').modal('show');
+            if (Invoice_ID == 0)
+                fn_CompleteSale(PayTypeID, PayType, PayAmt, PayNote);
+            else
+                fn_AddPaymentPart3(PayTypeID, PayType, PayAmt, PayNote, '');
+        }
+        function fn_CompleteSale(PayType_ID, PayType, PayAmt, PayNote, AuthCode) {
+            var URL = "../Sales/MakeInvoice";
+            var stCompany = $("#STCompany").val();
+            var stFirst = $("#STFirst").val();
+            var stLast = $("#STLast").val();
+            var stAddress1 = $("#STAddress1").val();
+            var stAddress2 = $("#STAddress2").val();
+            var stCity = $("#STCity").val();
+            var stState_ID = $("#STState").val();
+            var stZip = $("#STZip").val();
+            var stCountry_ID = $("#STCountry").val();
+            var stEmail = $("#STEmail").val();
+            var stPhone = $("#STPhone").val();
+            var InvoiceNotes = $("#InvoiceNotes").val();
+            var ShippingType_ID = $("#ShippingList").val();
+            var ShippingAmt = $("#CartShippingAmt").val().replace("$", "").replace(",", "");
+            var TaxAmt = $("#CartTaxTotal").val().replace("$", "").replace(",", "");
+            var InvoiceTotal = $("#CartTotal").val().replace("$", "").replace(",", "");
+            var InvoiceDue = InvoiceTotal;
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                data: {
+                    Customer_ID: Customer_ID,
+                    CustomerType: CustomerType,
+                    Company: stCompany,
+                    First: stFirst,
+                    Last: stLast,
+                    Address1: stAddress1,
+                    Address2: stAddress2,
+                    City: stCity,
+                    State_ID: stState_ID,
+                    Zip: stZip,
+                    Country_ID: stCountry_ID,
+                    Email: stEmail,
+                    Phone: stPhone,
+                    InvoiceNotes: InvoiceNotes,
+                    ShippingType_ID: ShippingType_ID,
+                    ShippingAmt: ShippingAmt,
+                    TaxCollected: TaxAmt,
+                    InvoiceTotal: InvoiceTotal
+                },
+                success: function (result) {
+                    jQuery.each(result, function (index, item) {
+                        if (item.Message == "Invoice Created") {
+                            Invoice_ID = item.Invoice_ID;
+                            $("#SearchWrapper1").hide();
+                            $("#AdvancedSearchButton").hide();
+                            $(".InputOption").attr('disabled', 'disabled');
+                            $("#DisplayInvoice_ID").text("Invoice: " + Invoice_ID);
+                            $(".InvoiceInfo").show();
+                            fn_AddPaymentPart3(PayType_ID, PayType, PayAmt, PayNote, AuthCode);
+                        } else {
+                            alert(item.Invoice_ID + ' / ' + item.Message);
+                        }
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Completing Invoice /" + thrownError);
+                }
+            });
+        }
+        function PopupCenter(url, title, w, h) {
+            // Fixes dual-screen position                         Most browsers      Firefox
+            var dualScreenLeft = window.screenLeft != undefined ? window.screenLeft : screen.left;
+            var dualScreenTop = window.screenTop != undefined ? window.screenTop : screen.top;
+
+            var width = window.innerWidth ? window.innerWidth : document.documentElement.clientWidth ? document.documentElement.clientWidth : screen.width;
+            var height = window.innerHeight ? window.innerHeight : document.documentElement.clientHeight ? document.documentElement.clientHeight : screen.height;
+
+            var left = ((width / 2) - (w / 2)) + dualScreenLeft;
+            var top = ((height / 2) - (h / 2)) + dualScreenTop;
+            var newWindow = window.open(url, title, 'statusbar=0, scrollbars=0, width=' + w + ', height=' + h + ', top=' + top + ', left=' + left);
+
+            // Puts focus on the newWindow
+            if (window.focus) {
+                newWindow.focus();
+            }
+        }
+        function fn_GetStateList(Country_ID, Source) {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Sales/GetStateList?Country_ID=" + Country_ID;
+            $.ajax({
+                type: 'GET',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#" + Source).children().remove();
+                    jQuery.each(result, function (index, item) {
+                        var NewState = '<option value=' + item.state_id + '>' + item.state_name + '</option>';
+                        $("#" + Source).append(NewState);
+                    });
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating State List /" + thrownError);
+                }
+            });
+        }
+        function fn_SelectCustomer(C_Type, Client_ID, State_ID, Country_ID, Tax_Exempt) {
+            Customer_ID = Client_ID;
+            CustomerType = C_Type;
+
+            var vCompany = $('#Company_' + C_Type + Client_ID).text();
+            var vFirst = $('#First_' + C_Type + Client_ID).text();
+            var vLast = $('#Last_' + C_Type + Client_ID).text();
+            var vAddress1 = $('#Address1_' + C_Type + Client_ID).text();
+            var vAddress2 = $('#Address2_' + C_Type + Client_ID).text();
+            var vCity = $('#City_' + C_Type + Client_ID).text()
+            var vZip = $('#Zip_' + C_Type + Client_ID).text()
+            var vEmail = $('#Email_' + C_Type + Client_ID).text()
+            var vPhone = $('#Phone_' + C_Type + Client_ID).text()
+            
+            $("#BTCompany").val(vCompany);
+            $("#BTFirst").val(vFirst);
+            $("#BTLast").val(vLast);
+            $("#BTAddress1").val(vAddress1);
+            $("#BTAddress2").val(vAddress2);
+            $("#BTCity").val(vCity);
+            $("#BTZip").val(vZip);
+            $("#BTEmail").val(vEmail);
+            $("#BTPhone").val(vPhone);
+            $("#CustomerSearchDiv").modal("hide");
+            $("#BTState").val(State_ID);
+            $("#BTCountry").val(Country_ID);
+
+            if (Tax_Exempt)
+                $("#TaxExempt").prop('checked', true);
+            else
+                $("#TaxExempt").prop('checked', false);
+            fn_CartTotal();
+        }
+        function fn_CustomerSearch() {
+            if (Invoice_ID == 0)
+            {
+                $('#myPleaseWait').modal('show');
+                var Company = $("#BTCompany").val();
+                var First = $("#BTFirst").val();
+                var Last = $("#BTLast").val();
+                var Address1 = $("#BTAddress1").val();
+                var Address2 = $("#BTAddress2").val();
+                var City = $("#BTCity").val();
+                var Zip = $("#BTZip").val();
+                var Email = $("#BTEmail").val();
+                var Phone = $("#BTPhone").val();
+                if (Company.length > 0 || First.length > 0 || Last.length > 0 || Address1.length > 0 || Address2.length || City.length > 0 || Zip.length > 0 || Email.length > 0 || Phone.length > 0) {
+                    var URL = "../Sales/CustomerSearch";
+                    $.ajax({
+                        type: 'POST',
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        data: {
+                            Company: Company,
+                            First: First,
+                            Last: Last,
+                            Address1: Address1,
+                            Address2: Address2,
+                            City: City,
+                            Zip: Zip,
+                            Email: Email,
+                            Phone: Phone
+                        },
+                        success: function (result) {
+                            CustomerTable.destroy();
+                            $("#CustomerTable > TBODY").empty();
+                            jQuery.each(result, function (index, item) {
+                                var NewRec = "<tr onclick=\"fn_SelectCustomer('" + item.Type + "', " + item.C_ID + "," + item.State_ID + "," + item.Country_ID + "," + item.Tax_Exempt + ");\">";
+                                NewRec += "<td style=\"text-align:center\">" + item.Type + "</td>";
+                                NewRec += "<td id=\"Company_" + item.Type + item.C_ID + "\">" + item.Company + "</td>";
+                                NewRec += "<td id=\"First_" + item.Type + item.C_ID + "\">" + item.First + "</td>";
+                                NewRec += "<td id=\"Last_" + item.Type + item.C_ID + "\">" + item.Last + "</td>";
+                                NewRec += "<td id=\"Address1_" + item.Type + item.C_ID + "\">" + item.Address1 + "</td>";
+                                NewRec += "<td id=\"Address2_" + item.Type + item.C_ID + "\">" + item.Address2 + "</td>";
+                                NewRec += "<td id=\"City_" + item.Type + item.C_ID + "\">" + item.City + "</td>";
+                                NewRec += "<td>" + item.State + "</td>";
+                                NewRec += "<td id=\"Zip_" + item.Type + item.C_ID + "\">" + item.Zip + "</td>";
+                                NewRec += "<td>" + item.Country + "</td>";
+                                NewRec += "<td id=\"Email_" + item.Type + item.C_ID + "\">" + item.Email + "</td>";
+                                NewRec += "<td id=\"Phone_" + item.Type + item.C_ID + "\">" + item.Phone + "</td>";
+                                $("#CustomerTable > tbody").append(NewRec);
+                            });
+                            $("#CustomerSearchDiv").modal("show");
+                            CustomerTable = $('#CustomerTable').DataTable({
+                                "destroy": true,
+                                "ordering": true,
+                                "scrollY": '40vh',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": true,
+                                "info": false,
+                                "autowidth": false,
+                            });
+
+                            $('#myPleaseWait').modal('hide');
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Searching Customer /" + thrownError);
+                        }
+                    });
+                } else {
+                    alert('You must enter some value to search for.  (Company or Name or Address or City or Zip or Phone or Email')
+                }
+            } else {
+                alert('Not allowed once invoice has been created.');
+            }
+        }
+        function fn_CustomerClear() {
+            if (Invoice_ID == 0) {
+                Customer_ID = 0; //Clears Customer ID assoicated with any order
+
+                $("#BTCompany").val('');
+                $("#BTFirst").val('');
+                $("#BTLast").val('');
+                $("#BTAddress1").val('');
+                $("#BTAddress2").val('');
+                $("#BTCity").val('');
+                $("#BTZip").val('');
+                $("#BTEmail").val('');
+                $("#BTPhone").val('');
+                $("#BTState").val(0);
+                $("#BTCountry").val(217);
+
+                $("#STCompany").val('');
+                $("#STFirst").val('');
+                $("#STLast").val('');
+                $("#STAddress1").val('');
+                $("#STAddress2").val('');
+                $("#STCity").val('');
+                $("#STZip").val('');
+                $("#STEmail").val('');
+                $("#STPhone").val('');
+                $("#STState").val(0);
+                $("#STCountry").val(217);
+
+                $("#BTCompany").focus();
+            } else {
+                alert("Not allowed once invoice has been created.");
+            }
+        }
+        function fn_CustomerCopy() {
+            if (Invoice_ID == 0)
+            {
+                $("#STCompany").val($("#BTCompany").val());
+                $("#STFirst").val($("#BTFirst").val());
+                $("#STLast").val($("#BTLast").val());
+                $("#STAddress1").val($("#BTAddress1").val());
+                $("#STAddress2").val($("#BTAddress2").val());
+                $("#STCity").val($("#BTCity").val());
+                $("#STZip").val($("#BTZip").val());
+                $("#STEmail").val($("#BTEmail").val());
+                $("#STPhone").val($("#BTPhone").val());
+                $("#STState").val($("#BTState").val());
+                $("#STCountry").val($("#BTCountry").val());
+                $("#STCompany").focus();
+            } else {
+                alert('Not allowed once invoice has been created.')
+            }
+        }
+        function fn_ChangePayType() {
+            var Balance = $("#CartBalance").val();
+            $("#PayAmt").val(Balance);
+            $("#PayAmt").focus();
+            $("#PayAmt").select();
+        }
+        function fn_ChangeShipping() {
+            var NewShipping = $("#ShippingList option:selected").text();
+            var NewAmt = NewShipping.substr(NewShipping.indexOf("$"), 10);
+            $("#CartShippingAmt").val(NewAmt);
+            fn_CartTotal();
+        }
+        function fn_RemoveCItem(Listing_ID) {
+            if (Invoice_ID == 0)
+            {
+                CartTable.destroy();
+                $("#Cart_" + Listing_ID).remove();
+                fn_CartTotal();
+            } else {
+                alert('Not allowed once invoice has been created.');
+            }
+        }
+        function fn_UpdatePrice(Listing_ID) {
+            var Price = $("#CPrice_" + Listing_ID).val().replace("$", "").replace(",", "");
+            var Qty = $("#CQty_" + Listing_ID).val();
+            var CTaxable = $("#CTaxable_" + Listing_ID).val();
+            var SubTotal = parseFloat(Price) * parseInt(Qty);
+            var TaxTotal;
+            if (CTaxable == "true")
+                TaxTotal = Math.round(parseFloat(SubTotal) * 8.25) / 100;
+            else
+                TaxTotal = 0.00;
+            $("#CPrice_" + Listing_ID).val(formatCurrency(Price));
+            $("#CSubTotal_" + Listing_ID).val(formatCurrency(SubTotal));
+            $("#CTax_" + Listing_ID).val(formatCurrency(TaxTotal));
+            fn_CartTotal();
+        }
+        function fn_CartTotal() {
+            var TotalSub = 0;
+            $(".CSubTotal").each(function () {
+                var value = $(this).val().replace("$", "").replace(",", "");
+                if (!isNaN(value) && value.length != 0) {
+                    TotalSub += parseFloat(value);
+                }
+            });
+            var TE = $("#TaxExempt").is(':checked');
+            var TotalTax = 0;
+            if (TE == false)
+            $(".CTax").each(function () {
+                var value = $(this).val().replace("$", "").replace(",", "");
+                if (!isNaN(value) && value.length != 0) {
+                    TotalTax += parseFloat(value);
+                }
+            });
+            var TotalPaid = 0;
+            $(".PAmt").each(function () {
+                var value = $(this).text().replace("$", "").replace(",", "");
+                if (!isNaN(value) && value.length != 0) {
+                    TotalPaid += parseFloat(value);
+                }
+            });
+            CartTable = $('#CartTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "scrollY": '70vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "autowidth": true,
+                "columnDefs": [
+                    { targets: [11], orderable: false },
+                ],
+            });
+            PayTable = $("#PayTable").DataTable({
+                "destroy": true,
+                "ordering": false,
+                "scrollY": '100px',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "autowidth": true,
+            })
+            $("#CartSubtotal").val(formatCurrency(TotalSub));
+            $("#CartTaxTotal").val(formatCurrency(TotalTax));
+            var ShipAmt = $("#CartShippingAmt").val().replace("$", "");
+            var CartTotal = Math.round((parseFloat(TotalSub) + parseFloat(TotalTax) + parseFloat(ShipAmt)) * 100) / 100;
+            var CartBalance = Math.round((parseFloat(CartTotal) - parseFloat(TotalPaid)) * 100) / 100;
+            //alert(CartTotal + " / " + CartBalance);
+            if (CartTotal > 0 && CartBalance == 0)
+            {
+                fn_FinishSale();
+            } else {
+                $("#CartShippingAmt").val(formatCurrency(ShipAmt));
+                $("#CartTotal").val(formatCurrency(CartTotal));
+                $("#CartPayTotal").val(formatCurrency(TotalPaid));
+                $("#CartBalance").val(formatCurrency(CartBalance));
+
+                setTimeout(function () {
+                    $("#PayAmt").val(formatCurrency(CartBalance));
+                    $("#PayAmt").focus();
+                }, 250);
+            }
+        }
+        function fn_AddItem(Listing_ID) {
+
+            var BGColor = $("#ATTR_" + Listing_ID).css("background-color");
+            if (BGColor == "rgb(173, 216, 230)")
+                Type = "Spec";
+            else
+                Type = "Normal";
+
+            if (BGColor == "rgb(255, 0, 0)")
+                alert("This item has already been added to your card and may not be added again.");
+            else {
+                $("#ATTR_" + Listing_ID).css("background-color", "red");
+                $("#Qty_" + Listing_ID).attr("disabled", "disabled");
+                $("#Add_" + Listing_ID).attr("disabled", "disabled");
+                CartTable.destroy();
+                var CurrQty = $("#Qty_" + Listing_ID).val();
+                var CurrPrice = $("#Price_" + Listing_ID).text().replace('$', '').replace(',', '')
+                var CurrAmt = 0;
+                var CurrTaxAmt = 0;
+                if (Taxable) {
+                    CurrAmt = parseFloat(CurrPrice) * parseInt(CurrQty)
+                    CurrTaxAmt = Math.round(CurrAmt * 8.25) / 100;
+                } else {
+                    CurrAmt = parseFloat(CurrPrice) * parseInt(CurrQty)
+                    CurrTaxAmt = 0.00;
+                }
+                var NewRec = "<tr id=\"Cart_" + Listing_ID + "\"><td style=\"text-align:center\">" + Type + "</td>";
+                NewRec += "<td><input type='hidden' id=\"CTaxable_" + Listing_ID + "\" value=" + Taxable + "> " + EventName + "</td><td>" + EventDate + "</td><td>" + EventVenue + "</td>";
+                NewRec += "<td style=\"text-align:center\">" + $("#Section_" + Listing_ID).text() + "</td>";
+                NewRec += "<td style=\"text-align:center\">" + $("#Row_" + Listing_ID).text() + "</td>";
+                NewRec += "<td style=\"text-align:center\">" + $("#Seats_" + Listing_ID).text() + "</td>";
+                NewRec += "<td style=\"text-align:center\">" + $("#AQty_" + Listing_ID).html().replace("disabled=\"disabled\"", "").replace("Qty_", "CQty_").replace(">", " class='InputOption', onchange=fn_UpdatePrice(" + Listing_ID + ");>") + "</td>";
+                NewRec += "<td style=\"text-align:center\"><input type='text' class=\"InputOption\" id=\"CPrice_" + Listing_ID + "\" onchange=\"fn_UpdatePrice(" + Listing_ID + ");\" onclick='this.select();' style='text-align:right; max-width:75px;' value=\"" + $("#Price_" + Listing_ID).text() + "\"></td>";
+                NewRec += "<td style=\"text-align:center\"><input type='text' class=\"CSubTotal\" id=\"CSubTotal_" + Listing_ID + "\" style=\"width:75px; text-align:right; background-color:lightgray;\" readonly=\"readonly\" value=\"" + formatCurrency(CurrAmt) + "\" ></td>";
+                NewRec += "<td style=\"text-align:center\"><input type='text' class=\"CTax\" id=\"CTax_" + Listing_ID + "\" style=\"width:60px; text-align:right; background-color:lightgray;\" readonly=\"readonly\" value=\"" + formatCurrency(CurrTaxAmt) + "\" ></td>";
+                NewRec += "<td style=\"text-align:center\"><i class=\"InputOption material-icons\" style=\"text-align:center; color:#aec72d; margin-top:0px;\" onclick=\"fn_RemoveCItem(" + Listing_ID + ");\">remove_shopping_cart</i></td>";
+                $("#CartTable > tbody").append(NewRec);
+                $("#CQty_" + Listing_ID).val(CurrQty);
+
+                fn_CartTotal();
+            }
+        }
+        function fn_GetEventItems(Event_ID) {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Sales/GetItemsForEvent?Event_ID=" + Event_ID;
+            $.ajax({
+                type: 'GET',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    vSearch = "";
+                    AvailableTable.destroy();
+                    $("#AvailableTable > TBODY").empty();
+                    jQuery.each(result, function (index, item) {
+                        var NewRec = "<tr style='background-color:" + item.TRColor + "' id=\"ATTR_" + item.Listing_ID + "\">";
+                        NewRec += "<td id=\"Section_" + item.Listing_ID + "\" style=\"text-align:center\">";
+                        if (item.Zone == "Unknown")
+                            NewRec += item.Section + "</td>";
+                        else
+                            NewRec += "<a href=\"#\" style=\"color:blue;\" title=\"" + item.Zone + "\">" + item.Section + "</a></td>";
+                        NewRec += "<td id=\"Row_" + item.Listing_ID + "\" style=\"text-align:center\">" + item.Row + "</td>";
+                        NewRec += "<td id=\"Seats_" + item.Listing_ID + "\" style=\"text-align:center\">" + item.Seats + "</td>";
+                        NewRec += "<td id=\"AQty_" + item.Listing_ID + "\" style=\"text-align:center; color:rgb(0,84,159);\"><select id=Qty_" + item.Listing_ID + ">";
+                        for (i = item.Qty; i > 0; i--) {
+                            NewRec += "<option value=" + i + ">" + i + "</option>";
+                        }
+                        NewRec += "</select></td>";
+                        NewRec += "<td id=\"Price_" + item.Listing_ID + "\" style=\"text-align:right; padding-right:4px;\">" + formatCurrency(item.Price) + "</td>";
+                        NewRec += "<td style=\"text-align:center;\"><i class=\"material-icons\" style=\"font-size:18px; color:" + item.Internal + "; padding-right:0px;\" title=\"" + item.Internal_Notes +"\">sms_failed</i></td>";
+                        NewRec += "<td style=\"text-align:center;\"><i class=\"material-icons\" style=\"font-size:18px; color:" + item.DeliveryColor + "; padding-right:0px;\" title=\"" + item.ticket_group_stock_type_desc +"\">" + item.DeliveryIcon + "</i></td>";
+                        NewRec += "<td style=\"text-align:center;\">";
+                        NewRec += "<i id=\"Add_" + item.Listing_ID + "\" class=\"material-icons\" style=\"color:#aec72d; margin-top:0px;\" onclick='fn_AddItem(" + item.Listing_ID + ");'>add_shopping_cart</i></tr>";
+                        
+                        $("#AvailableTable > tbody").append(NewRec);
+                    });
+                    $("#ItemsListDiv").modal("show");
+                    AvailableTable = $('#AvailableTable').DataTable({
+                        "ordering": true,
+                        "scrollY": '40vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "autowidth": false,
+                        "order": [[1, "asc"]]
+                    });
+
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Getting Items for Event /" + thrownError);
+                }
+            });
+        }
+        function fn_SelectEvent(Event_ID) {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Sales/GetEventInfo?Event_ID=" + Event_ID;
+            $.ajax({
+                type: 'GET',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#SearchResult").hide();
+                    $("#AdvancedSearch2Div").modal('hide');
+                    fn_ClearSearch();
+                    jQuery.each(result, function (index, item) {
+                        if (index == "Taxable")
+                            Taxable = item;
+                        if (index == "EventDate") {
+                            $("#HDate").text(item);
+                            EventDate = item;
+                        }
+                        if (index == "DUE")
+                            $("#HDUE").text(item);
+                        if (index == "VenueName") {
+                            $("#HVenue").text(item);
+                            EventVenue = item;
+                        }
+                        if (index == "VenueCity")
+                            $("#HCity").text(item);
+                        if (index == "Rankings")
+                            $("#HRankings").text(item);
+                        if (index == "EventName") {
+                            $("#HEventName").text(item);
+                            EventName = item;
+                        }
+                        if (index == "Low")
+                        {
+                            if (item == null)
+                                $("#Weather").hide();
+                            else
+                                $("#WLow").html(item + "&deg;");
+                        }
+                        if (index == "High")
+                            $("#WHigh").html(item + "&deg;");
+                        if (index == "Icons")
+                            $("#WIcons").html(item);
+                        if (index == "Description")
+                            $("#WDescription").html(item);
+                        if (index == "Rain")
+                            $("#WRain").html(item);
+                        if (index == "Chance")
+                            $("#WChance").html(item);
+                        if (index == "Wind")
+                            $("#WWind").html(item + "<img src='../Images/wind.png' style='height:15px;' />");
+
+                    });
+                    fn_GetEventItems(Event_ID, result);
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Getting Event Info /" + thrownError);
+                }
+            });
+        }
+        function fn_CloseAdvancedSearch() {
+            $('.modal.in:visible').modal('hide');
+        }
+        function fn_Continue() {
+            vSD = $("#StartDateAdv").val();
+            vED = $("#EndDateAdv").val();
+            vUpdate = false;
+            var $datepicker = $('#StartDateAdv2');
+            $datepicker.datepicker('setDate', vSD);
+            var $datepicker = $('#EndDateAdv2');
+            $datepicker.datepicker('setDate', vED);
+            vUpdate = true;
+            var vCatID = $("#CatList").val();
+            var vHeadlinerID = $("#HeadlinerList").val();
+            var vOptionID = $("#OptionList").val();
+            $("#CatList2").val(vCatID);
+            $("#HeadlinerList2").val(vHeadlinerID);
+            $("#OptionList2").val(vOptionID);
+            fn_BuildAdvancedSearch()
+        }
+        function fn_UpdateHeadlinerList() {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Dashboard/BuildHeadlinerList";
+            if ($("#AdvancedSearch2Div").is(':visible')) {
+                vSD = $("#StartDateAdv2").val();
+                vED = $("#EndDateAdv2").val();
+                var vCatID = $("#CatList2").val();
+            } else {
+                vSD = $("#StartDateAdv").val();
+                vED = $("#EndDateAdv").val();
+                var vCatID = $("#CatList").val();
+            }
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Start: vSD,
+                    End: vED,
+                    CatID: vCatID
+                }, cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#HeadlinerList").empty();
+                    $("#HeadlinerList2").empty();
+                    $.each(result, function (key, value) {
+                        $("#HeadlinerList").append('<option value=' + value.Headliner_ID + '>' + value.Event_Headliner + '</option>');
+                        $("#HeadlinerList2").append('<option value=' + value.Headliner_ID + '>' + value.Event_Headliner + '</option>');
+                    });
+                    $("#HeadlinerList").val(0);
+                    $("#HeadlinerList2").val(0);
+                    if ($("#AdvancedSearch2Div").is(':visible')) {
+                        fn_BuildAdvancedSearch();
+                    }
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Getting Headliner List /" + thrownError);
+                }
+            });
+        }
+        function fn_BuildAdvancedSearch() {
+            if (vUpdate) {
+                $('#myPleaseWait').modal('show');
+                vSD = $("#StartDateAdv2").val();
+                vED = $("#EndDateAdv2").val();
+                var vCatID = $("#CatList2").val();
+                var vHeadlinerID = $("#HeadlinerList2").val();
+                var vOptionID = $("#OptionList2").val();
+                var URL = "../Dashboard/AdvancedSearch";
+                $.ajax({
+                    type: 'POST',
+                    data: {
+                        Start: vSD,
+                        End: vED,
+                        CatID: vCatID,
+                        HeadlinerID: vHeadlinerID,
+                        OptionID: vOptionID
+                    },
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        var AdvancedSearchTable2 = $("#AdvancedSearchTable2").DataTable().destroy();
+                        $("#AdvancedSearchTable2 tbody").empty();
+                        var vEventCount = 0;
+                        var vAvailableQty = 0;
+                        var vAvailableCost = 0;
+                        var vAvailablePrice = 0;
+                        var vSoldQty = 0;
+                        var vSoldCost = 0;
+                        var vProfit = 0;
+                        $.each(result, function (key, value) {
+                            vEventCount += 1;
+                            vAvailableQty += value.AvailableQty;
+                            vAvailableCost += value.AvailableCost;
+                            vAvailablePrice += value.AvailablePrice;
+                            vSoldQty += value.SoldQty;
+                            vSoldCost += value.SoldCost;
+                            vProfit += (value.Profit);
+                            var NewRec = "<tr id='Advanced_" + value.Event_ID + "' onclick=\"fn_SelectEvent(" + value.Event_ID + ");\"><td style='text-align:center;'>" + value.DUE + "</td><td>" + value.Event_Date + "</td><td><a href='#' title='" + value.EventHover + "' >" + value.Event_Name + "</a></td><td>" + value.LastSold + "</td><td>" + value.LastPriced + "</td><td style='text-align:right; background-color:rgba(229,229,229,0.24);'>" + value.AvailableQty + "</td><td style='text-align:right; background-color:rgba(229,229,229,0.24);'>" + formatCurrency(value.AvailableCost) + "</td><td style='text-align:right; background-color:rgba(229,229,229,0.24);'>" + formatCurrency(value.AvailablePrice) + "</td><td style='text-align:right;'>" + value.SoldQty + "</td><td style='text-align:right;'>" + formatCurrency(value.SoldCost) + "</td><td style='text-align:right;'>" + formatCurrency(value.Profit) + "</td></tr>";
+                            $("#AdvancedSearchTable2 > tbody").append(NewRec);
+                        })
+                        $('#myPleaseWait').modal('hide');
+                        if ($("#AdvancedSearch2Div").is(':hidden'))
+                            $("#AdvancedSearch2Div").modal('show');
+                        $("#AdvancedSearchTable2").show();
+                        var AdvancedSearchTable2 = $('#AdvancedSearchTable2').DataTable({
+                            "destroy": true,
+                            "scrollY": '300px',
+                            "scrollCollapse": true,
+                            "paging": false,
+                            "searching": true,
+                            "autoWidth": true,
+                            "info": false,
+                            "footerCallback": function (tfoot, data, start, end, display) {
+                                $(tfoot).find('th').eq(0).html(vEventCount + " Events");
+                                $(tfoot).find('th').eq(1).html(vAvailableQty);
+                                $(tfoot).find('th').eq(2).html(formatCurrency(vAvailableCost));
+                                $(tfoot).find('th').eq(3).html(formatCurrency(vAvailablePrice));
+                                $(tfoot).find('th').eq(4).html(vSoldQty);
+                                $(tfoot).find('th').eq(5).html(formatCurrency(vSoldCost));
+                                $(tfoot).find('th').eq(6).html(formatCurrency(vProfit));
+                            }
+                        });
+                        AdvancedSearchTable2
+                             .rows()
+                             .nodes()
+                             .to$()
+                             .addClass('TableTr');
+                        setTimeout(function () {
+                            AdvancedSearchTable2.draw();
+                        }, 500);
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Getting Advanced Search List /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_AdvancedSearch() {
+            fn_ClearSearch();
+            $('#AdvancedSearchDiv').modal('show');
+        }
+        function doDelayedSearch(e) {
+            $("#ClearSearch").show();
+            if (e.key == 'Enter')
+                doSearch(); //this is your existing function
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(function () {
+                doSearch(); //this is your existing function
+            }, 2000);
+        }
+        function fn_ClearSearch() {
+            $("#ClearSearch").hide();
+            var mpw = $('#myPleaseWait').is(':hidden');
+            var sr = $('#SearchResult').is(':visible');
+            if (mpw && sr) {
+                setTimeout(function () {
+                    $("#SearchBox").val("");
+                    $("#SearchResult").hide();
+                }, 250)
+            }
+            $("#SearchBox").val("");
+            $("#SearchBox").focus();
+        }
+        function doSearch() {
+            var Search = $("#SearchBox").val();
+            if (Search != vSearch) {
+                $('#myPleaseWait').modal('show');
+                var Search = $("#SearchBox").val();
+                vSearch = Search;
+                setTimeout(function () {
+                    if (Search.length == 0) {
+                        $("#SearchResult").hide();
+                        $('#myPleaseWait').modal('hide');
+                    } else {
+                        var URL = "../Dashboard/Search?Input=" + Search;
+                        $.ajax({
+                            type: "GET",
+                            cache: false,
+                            aysnc: true,
+                            url: URL,
+                            success: function (result) {
+                                var foot = result.length + "&nbsp;events&nbsp;found.";
+                                var SearchResultTable = $("#SearchResultTable").DataTable().destroy();
+                                $("#SearchResultTable tbody").empty();
+                                $.each(result, function (key, value) {
+                                    var Text = "<div class='SearchResult1'>" + value.Description + "</div>";
+                                    var Text2 = Text.toLowerCase();
+                                    var Search2 = Search.toLowerCase();
+                                    var FindAt = Text2.indexOf(Search2);
+                                    var TextNew = Text.substr(0, FindAt) + "<span style='font-weight:bold; color:#525252'>" + Search + "</span>" + Text.substring(FindAt + Search.length, 200);
+                                    var NewRec = "<tr id='Search_" + value.Event_ID + "' onclick=\"fn_SelectEvent(" + value.Event_ID + ");\"><td class='TableTd' style='border:thin black 1px;'>" + value.SortDate +
+                                        "</td><td>" + "<div class='SearchResult1' >" + TextNew + "</div>" +
+                                        "</td></tr>";
+                                    $("#SearchResultTable > tbody").append(NewRec);
+                                })
+                                var SearchResultTable = $('#SearchResultTable').DataTable({
+                                    "destroy": true,
+                                    "scrollY": '300px',
+                                    "scrollCollapse": true,
+                                    "paging": false,
+                                    "searching": false,
+                                    "autoWidth": true,
+                                    "info": false,
+                                    "columnDefs": [
+                                        { visible: false, targets: [0] },
+                                    ],
+                                    "footerCallback": function (tfoot, data, start, end, display) {
+                                        $(tfoot).find('th').eq(0).html(foot);
+                                    }
+                                });
+                                $("#SearchResult").show();
+                                $('#myPleaseWait').modal('hide');
+                            },
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                $('#myPleaseWait').modal('hide');
+                                alert("Error: Searching /" + thrownError);
+                            }
+                        });
+                    }
+                }, 500);
+                setTimeout(function () {
+                    $("#SearchBox").focus();
+                }, 500)
+            }
+        }
+        function fn_AdvancedSearch() {
+            fn_ClearSearch();
+            $('#AdvancedSearchDiv').modal('show');
+        }
+
+        window.onresize = function () {
+            CartTable.columns.adjust().draw();
+        }
+
+        $(document).ready(function () {
+            PayTable = $("#PayTable").DataTable({
+                "ordering": false,
+                "scrollY": '100px',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "autowidth": true,
+            })
+            CustomerTable = $('#CustomerTable').DataTable({
+                "ordering": true,
+                "scrollY": '40vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "autowidth": false,
+            });
+            AvailableTable = $('#AvailableTable').DataTable({
+                "ordering": true,
+                "scrollY": '40vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "autowidth": false,
+                "order": [[1, "asc"]]
+            });
+            $(".NavBar").css("background-color", "");
+            $("#SA").css("background-color", "#353535");
+            if ($(window).width() > 1135) {
+                $("#IconBar2").show();
+                $("#wrapper").toggleClass("toggled");
+            } else
+                $("#IconBar").show();
+
+            $("#SearchWrapperDiv").show();
+            $("#LoginWrapper").show();
+            $("#InventoryDiv").show();
+            $("#BTCountry").val(217);
+            $("#STCountry").val(217);
+
+            CartTable = $('#CartTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "scrollY": '70vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "autowidth": true,
+                "columnDefs": [
+                    { targets: [11], orderable: false },
+                ],
+            });
+            setTimeout(function () {
+                CartTable.draw();
+                $("#SearchBox").focus();
+            }, 250);
+        });
+    </script>
+}
+<div style="display:block; width:100%; text-align:center;float:left;">
+    <div style="margin:0 auto; width:900px;">
+        <div style="clear:both; display:block; width:360px; margin:10px; margin-left:50px; padding:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); float:left;">
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; float:left; font-weight:bold; font-size:18pt;">Bill To</label>
+                <label for="TaxExempt" style="margin:5px; margin-top:13px;">Tax Exempt</label><input class="InputOption" type="checkbox" id="TaxExempt" onchange="fn_CartTotal();" />
+                <a href="#" style="float:right; font-weight:bold; margin-right:10px; margin-top:10px;" onclick="fn_CustomerSearch();">Search</a>
+                <a href="#" style="float:right; font-weight:bold; margin-right:10px; margin-top:10px;" onclick="fn_CustomerClear();">Reset</a>
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Company</label><input autocomplete="nope" class="InputOption" id="BTCompany" maxlength="100" style="width:267px;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">First Name</label><input autocomplete="nope" class="InputOption" id="BTFirst" maxlength="100" style="background-color:rgb(250, 255, 189); width:100px; margin-left:6px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">Last Name</label><input autocomplete="nope" class="InputOption" id="BTLast" maxlength="200" style="background-color:rgb(250, 255, 189); margin-left:1px; width:100px; float:left;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Address1</label><input autocomplete="nope" class="InputOption" id="BTAddress1" maxlength="100" style="background-color:rgb(250, 255, 189); width:267px;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Address2</label><input autocomplete="nope" class="InputOption" id="BTAddress2" maxlenght="100" style="width:267px;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">City</label><input autocomplete="nope" class="InputOption" id="BTCity" maxlength="100" style="margin-left:6px; background-color:rgb(250, 255, 189); width:108px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">State</label><div style="float:left;">@Html.DropDownList("StateList", null, new { @class = "InputOption RoundedDropDown", @id = "BTState", @style = "background-color:rgb(250, 255, 189); height:22px; max-width:45px;" })</div>
+                <label style="margin:5px; float:left; font-weight:bold;">Zip</label><input autocomplete="nope" class="InputOption" id="BTZip" maxlength="25" style="background-color:rgb(250, 255, 189); width:50px; float:left;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Country</label><div style="float:left;">@Html.DropDownList("CountryList", null, new { @class = "InputOption RoundedDropDown", @id = "BTCountry", @style = "margin-left:6px; background-color:rgb(250, 255, 189); height:22px; width:267px;", @onchange = "fn_GetStateList(this.value, 'BTState');" })</div>
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Email</label><input autocomplete="nope" class="InputOption" id="BTEmail" maxlength="500" style="margin-left:6px; width:123px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">Phone</label><input autocomplete="nope" class="InputOption" id="BTPhone" maxlength="100" style="background-color:rgb(250, 255, 189); width:100px; float:left;" />
+            </div>
+        </div>
+        <div style="display:block; width:360px; margin:10px; margin-right:50px; padding:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); float:right;">
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; float:left; font-weight:bold; font-size:18pt;">Ship To</label>
+                <a href="#" style="float:right; font-weight:bold; margin-right:10px; margin-top:10px;" onclick="fn_CustomerCopy();">Copy From Bill To</a>
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Company</label><input autocomplete="nope" class="InputOption" id="STCompany" maxlength="100" style="width:267px;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">First Name</label><input autocomplete="nope" class="InputOption" id="STFirst" maxlength="100" style="background-color:rgb(250, 255, 189); width:100px; margin-left:6px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">Last Name</label><input autocomplete="nope" class="InputOption" id="STLast" maxlength="200" style="background-color:rgb(250, 255, 189); margin-left:1px; width:100px; float:left;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Address1</label><input autocomplete="nope" class="InputOption" id="STAddress1" maxlength="100" style="background-color:rgb(250, 255, 189); width:267px;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Address2</label><input autocomplete="nope" class="InputOption" id="STAddress2" maxlength="100" style="width:267px;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">City</label><input autocomplete="nope" class="InputOption" id="STCity" maxlength="100" style="margin-left:6px; background-color:rgb(250, 255, 189); width:108px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">State</label><div style="float:left;">@Html.DropDownList("StateList", null, new { @class = "InputOption RoundedDropDown", @id = "STState", @style = "background-color:rgb(250, 255, 189); height:22px; max-width:45px;" })</div>
+                <label style="margin:5px; float:left; font-weight:bold;">Zip</label><input autocomplete="nope" class="InputOption" id="STZip" maxlength="25" style="background-color:rgb(250, 255, 189); width:50px; float:left;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Country</label><div style="float:left;">@Html.DropDownList("CountryList", null, new { @class = "InputOption RoundedDropDown", @id = "STCountry", @style = "margin-left:6px; background-color:rgb(250, 255, 189); height:22px; width:267px;", @onchange = "fn_GetStateList(this.value, 'STState');" })</div>
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Email</label><input autocomplete="nope" class="InputOption" id="STEmail" maxlength="500" style="margin-left:6px; width:123px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">Phone</label><input autocomplete="nope" class="InputOption" id="STPhone" maxlength="100" style="background-color:rgb(250, 255, 189); width:100px; float:left;" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="CartTableDiv" style="width:98%; margin-left:20px; margin-top:10px; background-color:transparent; float:left; display:block">
+    <table id="CartTable" class="table-bordered" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+        <thead>
+            <tr style="height:30px;">
+                <th style="text-align:center; max-width:50px;">Type</th>
+                <th style="text-align:center;">Event</th>
+                <th style="text-align:center;">Date</th>
+                <th style="text-align:center;">Venue</th>
+                <th style="text-align:center;">Section</th>
+                <th style="text-align:center; max-width:50px;">Row</th>
+                <th style="text-align:center; max-width:50px;">Seats</th>
+                <th style="text-align:center; max-width:50px;">Qty</th>
+                <th style="text-align:center; max-width:75px;">Price</th>
+                <th style="text-align:center; max-width:75px;">SubTotal</th>
+                <th style="text-align:center; max-width:50px;">Tax</th>
+                <th style="text-align:center;"></th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+<div id="Bottom" style="width:99%; margin-left:20px; margin-top:10px; float:left;">
+    <div id="BottomLeft" style="display:block; float:left; width:155px; height:140px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+        <label style="margin:5px; font-weight:bold; float:left;">Invoice Notes:</label>
+        <textarea class="InputOption" id="InvoiceNotes" style="margin-left:5px; float:left; clear:both; height:80%; width:93%;"></textarea>
+    </div> 
+    <div id="BottomCenter" style="display:block; width:440px; margin-left:10px; float:left;">
+        <div style="float:left; width:100%; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+            <label style="margin:5px; margin-top:10px; font-weight:bold; float:left;">New Payment:</label>
+            <div style="float:left; margin:5px;">@Html.DropDownList("PayTypeList", null, new { @class = "RoundedDropDown", @onchange = "fn_ChangePayType();" })</div>
+            <label style="margin:5px; margin-top:10px; font-weight:bold; float:left;">Amount:</label>
+            <input id="PayAmt" style="margin-top:8px; text-align:right; width:75px; float:left;" onclick="this.select();" value="$0.00" />
+            <button style="font-size:10pt; margin-top:6px; background-color:#adc72e; float:right; margin-right:5px;" onclick="fn_AddPayment();">Add</button>
+        </div>
+        <div style="float:left; width:100%; height:100px; margin-top:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+            <table id="PayTable" class="table-bordered" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Note</th>
+                        <th style="text-align:right; max-width:75px;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        </div>
+    <div id="BottomRight" style="float:right;">
+        <div style="float:left; margin-top:25px; margin-right:5px; ">@Html.DropDownList("ShippingList", null, new { @class = "InputOption RoundedDropDown", @onchange= "fn_ChangeShipping();" })</div>
+        <div id="TotalDiv" style="float:right; display:block; margin-right:30px; padding:10px; font-weight:bold; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+            <div id="SubtotalDiv" style="float:right;">Subtotal&nbsp;<input id="CartSubtotal" style="text-align:right; width:75px; background-color:lightgray;" readonly="readonly" value="$0.00" /></div>
+            <div id="ShippingDiv" style="clear:both; float:right; ">Shipping&nbsp;<input class="InputOption" id="CartShippingAmt" style="text-align:right; width:75px;" onclick="this.select();" onchange="fn_CartTotal();" value="$15.00" /></div>
+            <div id="TaxDiv" style="clear:both; float:right;">Tax Collected&nbsp;<input id="CartTaxTotal" style="text-align:right; width:75px; background-color:lightgray;" readonly="readonly" value="$0.00" /></div>
+            <div id="TotalDiv" style="clear:both; float:right;">Order Total&nbsp;<input id="CartTotal" style="text-align:right; width:75px; background-color:lightgray;" readonly="readonly" value="$0.00" /></div>
+            <div id="PaymentDiv" style="clear:both; float:right;">Payment(s)&nbsp;<input id="CartPayTotal" style="text-align:right; width:75px; background-color:lightgray;" readonly="readonly" value="$0.00" /></div>
+            <div id="BalanceDiv" style="clear:both; float:right;">Balance&nbsp;<input id="CartBalance" style="text-align:right; width:75px; background-color:lightgray;" readonly="readonly" value="$0.00" /></div>
+        </div>
+    </div>
+</div>
+
+<!--MODAL BEGINS-->
+<div class="modal loadingModal" id="CustomerSearchDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#2e68a3; width:1000px;">
+            <div class="modal-body">
+                <table id="CustomerTable" class="table-bordered" style="width:100%;border-radius:4px; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); background-color:white;" border="0">
+                    <thead>
+                        <tr style="height:30px;">
+                            <th style="text-align:center;">Type</th>
+                            <th style="text-align:center;">Company</th>
+                            <th style="text-align:center;">First</th>
+                            <th style="text-align:center;">Last</th>
+                            <th style="text-align:center;">Address1</th>
+                            <th style="text-align:center;">Address2</th>
+                            <th style="text-align:center;">City</th>
+                            <th style="text-align:center;">State</th>
+                            <th style="text-align:center;">Zip</th>
+                            <th style="text-align:center;">Country</th>
+                            <th style="text-align:center;">Email</th>
+                            <th style="text-align:center;">Phone</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer" style="display:flex; align-items:center; justify-content:center;">
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="display:flex; justify-content:center; background-color:#aec72d; color:#ffffff;" onclick="$('#SearchBox').select()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="ItemsListDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#2e68a3;">
+            <div class="modal-header" style="margin:10px; height:120px; border-radius:6px; background-color:#ffffff; padding:0px;">
+                <div style="display:block; width:450px; height:100%; margin-left:5px; float:left;">
+                    <div style="margin-left:10px; width:100%; max-width:100%; line-height:1em; height:2.4em; overflow:hidden;">
+                        <label id="HDate" class="-Listings" style="margin-left:0px;"></label>
+                        <i class="material-icons" style="margin-top:15px;font-size:14px; color:#adc72e; float:left;">grade</i>
+                        <label id="HDUE"class="-Listings" style="margin-left:-10px;"></label>
+                        <i class="material-icons" style="margin-top:15px;font-size:14px; color:#adc72e; float:left;">grade</i>
+                        <label id="HVenue"class="-Listings" style="margin-left:-10px;"></label>
+                        <i class="material-icons" style="margin-top:15px;font-size:14px; color:#adc72e; float:left;">grade</i>
+                        <label id="HCity"class="-Listings" style="margin-left:-10px;"></label>
+                        <i class="material-icons" style="margin-top:15px;font-size:14px; color:#adc72e; float:left;">grade</i>
+                        <label id="HRankings"class="-Listings" style="margin-left:-10px;"></label>
+                    </div>
+                    <div id="HEventName" style="margin-left:10px; width:100%; max-width:100%; font-size:40px; line-height:1em; height:2em; overflow:hidden;">
+                        
+                    </div>
+                </div>
+                <div id="Weather" style="height:100%; width:100px; background-color:aliceblue; border-radius:4px; float:right; display:block;">
+                    <div style="width:100%;">
+                        <div id="WLow" style="margin-left:10px; float:left; font-size:24px; color:lightblue;"></div>
+                        <div id="WHigh" style="margin-right:10px; float:right; font-size:24px;"></div>
+                    </div>
+                    <div id="WIcons" style="width:100%; float:left;">
+                        
+                    </div>
+                    <div style="width:100%; display:flex; margin-top:85px; text-align:center;">
+                        <div id="WDescription"style="margin:0 auto;"></div>
+                    </div>
+                    <div style="width:100%; ">
+                        <div id="WRain" style="margin-left:10px; float:left;"></div>
+                        <div id="WChance" style="margin-right:10px; float:right;"></div>
+                    </div>
+                    <div style="width:100%; display:flex; text-align:center;">
+                        <div id="WWind" style="margin:0 auto;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="AvailableTable" class="table-bordered" style="width:100%;border-radius:4px; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); background-color:white;" border="0">
+                    <thead>
+                        <tr style="height:30px;">
+                            <th style="text-align:center;">Sec</th>
+                            <th style="text-align:center;">Row</th>
+                            <th style="text-align:center;">Seats</th>
+                            <th style="text-align:center;">Qty</th>
+                            <th style="text-align:center;">PRICE</th>
+                            <th style="text-align:center;">Int</th>
+                            <th style="text-align:center;">S/M</th>
+                            <th style="text-align:center;"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer" style="display:flex; align-items:center; justify-content:center;">
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="display:flex; justify-content:center; background-color:#aec72d; color:#ffffff;" onclick="$('#BTCompany').select()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal bs-example-modal-sm" id="AdvancedSearchDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" style="color:white; margin-top:15px; float:left;">Options</h1>
+                <div>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="margin:18px; background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding:0px;">
+                <div style="width:100%; text-align:center;">
+                    <div style="display:inline-block;">
+                        <div style="display:inline-block; margin:0 auto; float:left;">
+                            <div id="FromDate" style="margin:5px; display:block; float:left;">
+                                <h1 style="width: 31px;height: 16px;font-size: 13px;font-weight: 500;line-height: 1.23;color: #353535; display:block;">From</h1>
+                                <div class="input-group date" data-provide="datepicker" style="width:130px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5;">
+                                    <input type="text" id="StartDateAdv" class="form-control" style="background-color:transparent; border:none;" value="@Session["StartDate"]">
+                                    <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                                        <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="ToDate" style="margin:5px; display:block; float:left;">
+                                <h1 style="width: 31px;height: 16px;font-size: 13px;font-weight: 500;line-height: 1.23;color: #353535;">To</h1>
+                                <div class="input-group date" data-provide="datepicker" style="width:130px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5;">
+                                    <input type="text" id="EndDateAdv" class="form-control" style="background-color:transparent; border:none;" value="@Session["EndDate"]">
+                                    <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                                        <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:block; text-align:center; margin:auto 0; float:left; width:100%; clear:both;">
+                            @Html.DropDownList("CatList", null, new { @class = "RoundedDropDown", @style = "margin-top:10px;", @onchange = "fn_UpdateHeadlinerList();" })
+                        </div>
+                        <div style="display:block; text-align:center; margin:auto 0; margin-top:10px; float:left; width:100%; clear:both;">
+                            @Html.DropDownList("HeadlinerList", null, new { @id = "HeadlinerList", @class = "RoundedDropDown" });
+                        </div>
+                        <div style="display:block; text-align:center; margin:auto 0; margin-top:10px; float:left; width:100%; clear:both;">
+                            @Html.DropDownList("OptionList", null, new { @class = "RoundedDropDown" })
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="text-align:center;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_Continue();">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="AdvancedSearch2Div" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px; width:1200px; max-width:1200px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="margin-left:10px; margin-top:6px; float:left;">
+                    <h1 style="height:16px; font-size:17px; font-weight:500; line-height:1.23; color:#ffffff;">From</h1>
+                    <div class="input-group date" data-provide="datepicker" style="margin-left:40px; margin-top:-33px; width:140px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5; float:left;">
+                        <input type="text" id="StartDateAdv2" class="form-control" style="background-color:transparent; border:none;" onchange="fn_BuildAdvancedSearch()">
+                        <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                            <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-left:10px; margin-top:6px; float:left;">
+                    <h1 style="height:16px; font-size:17px; font-weight:500; line-height:1.23; color:#ffffff;">To</h1>
+                    <div class="input-group date" data-provide="datepicker" style="margin-left:20px; margin-top:-33px; width:140px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5; float:left;">
+                        <input type="text" id="EndDateAdv2" class="form-control" style="background-color:transparent; border:none;" onchange="fn_BuildAdvancedSearch()">
+                        <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                            <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:left;">
+                    @Html.DropDownList("CatList", null, new { @id = "CatList2", @style = "max-width:150px;", @class = "RoundedDropDown", @onchange = "fn_UpdateHeadlinerList()" })
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:left;">
+                    @Html.DropDownList("HeadlinerList", null, new { @id = "HeadlinerList2", @style = "max-width:150px;", @class = "RoundedDropDown", @onchange = "fn_BuildAdvancedSearch();" });
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:left;">
+                    @Html.DropDownList("OptionList", null, new { @id = "OptionList2", @style = "max-width:150px;", @class = "RoundedDropDown", @onchange = "fn_BuildAdvancedSearch()" })
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:10px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_CloseAdvancedSearch()">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="AdvancedSearchTable2" class="table-bordered table-condensed" style="background-color:white; display:none;">
+                    <thead>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th colspan="5" style="border-bottom:white; border-top:white;"></th>
+                            <th colspan="3" style="border-bottom:black; background-color:rgb(53,53,53); color:white; text-align:center">Available</th>
+                            <th colspan="3" style="border-bottom:white; border-top:white; text-align:center;">Sold</th>
+                        </tr>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th class="TableTh">DUE</th>
+                            <th class="TableTh">Event Date</th>
+                            <th class="TableTh">Event Name</th>
+                            <th class="TableTh">Last Sold</th>
+                            <th class="TableTh">Last Priced</th>
+                            <th class="TableTh" style="background-color:rgb(53,53,53); color:white;">Qty</th>
+                            <th class="TableTh" style="background-color:rgb(53,53,53); color:white;">Cost</th>
+                            <th class="TableTh" style="background-color:rgb(53,53,53); color:white;">Price</th>
+                            <th class="TableTh">Qty</th>
+                            <th class="TableTh">Cost</th>
+                            <th class="TableTh">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th class="TableTh" colspan="5"></th>
+                            <th class="TableTh" style="background-color:rgb(53,53,53); color:white;"></th>
+                            <th class="TableTh" style="background-color:rgb(53,53,53); color:white;"></th>
+                            <th class="TableTh" style="background-color:rgb(53,53,53); color:white;"></th>
+                            <th class="TableTh"></th>
+                            <th class="TableTh"></th>
+                            <th class="TableTh"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="CheckPopupDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#2e68a3;">
+            <div class="modal-header" style="margin:10px; height:60px; border-radius:6px; background-color:#1c81db; padding:0px; text-align:center;">
+                <label style="margin:auto; color:white; font-size:18pt; float:left;">Required Information</label>
+            </div>
+           <div class="modal-body">
+               <label style="color:white; font-weight:bold; margin-top:10px; margin-left:20px; float:left;">Check Number:</label>
+               <input id="CheckNumber" style="margin:5px; width:125px;" />
+            </div>
+            <div class="modal-footer" style="display:flex; align-items:center; justify-content:center;">
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="display:flex; justify-content:center; background-color:#aec72d; color:#ffffff;" onclick="fn_AddCheckNumber();">Process</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="display:flex; justify-content:center; background-color:#aec72d; color:#ffffff;" onclick="$('#SearchBox').select()">Abort</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="PayNotePopupDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#2e68a3;">
+            <div class="modal-header" style="margin:10px; height:60px; border-radius:6px; background-color:#1c81db; padding:0px; text-align:center;">
+                <label style="margin:auto; color:white; font-size:18pt; float:left;">Add Payment Note (optional)</label>
+            </div>
+            <div class="modal-body">
+                <label style="color:white; font-weight:bold; margin-top:10px; float:left;">Note:</label>
+                <input id="PayNote" style="margin:5px; width:185px;" />
+            </div>
+            <div class="modal-footer" style="display:flex; align-items:center; justify-content:center;">
+                <button type="button" class="btn btn-default" style="display:flex; justify-content:center; background-color:#aec72d; color:#ffffff;" onclick="fn_AddPayNote();">Process</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="display:flex; justify-content:center; background-color:#aec72d; color:#ffffff;" onclick="$('#SearchBox').select()">Abort</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="CCPopupDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#2e68a3;">
+            <div class="modal-header" style="margin:10px; height:60px; border-radius:6px; background-color:#1c81db; padding:0px; text-align:center; float:left;">
+                <label style="margin:auto; color:white; font-size:18pt; float:left;">Credit Card Information</label>
+            </div>
+            <div class="modal-body">
+                <div style="display:block; float:left;">
+                    <label style="margin:auto; color:white; font-size:12pt; margin:5px; float:left;">Name:</label>
+                    <input id="CardName" style="margin:5px; width:185px;" />
+                </div>
+                <div style="display:block; float:left;">
+                    @Html.DropDownList("CCTList", null, new { @class = "RoundedDropDown", @id = "CCType", @style = "height:22px; max-width:150px; float:left;" })
+                    <label style="margin:auto; color:white; font-size:12pt; margin:5px; float:left;">Number:</label>
+                    <input id="CardNumber" style="margin:5px; width:120px;" />
+                </div>
+                <div style="display:block; float:left;">
+                    @Html.DropDownList("CCMList", null, new { @class = "RoundedDropDown", @id = "CCMonth", @style = "height:22px; max-width:150px; margin-right:5px; float:left;" })
+                    @Html.DropDownList("CCYList", null, new { @class = "RoundedDropDown", @id = "CCYear", @style = "height:22px; max-width:150px; float:left;" })
+                    <label style="margin:auto; color:white; font-size:12pt; margin:5px; float:left;">CVV2:</label>
+                    <input id="CVVNumber" style="margin:5px; width:40px;" />
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex; align-items:center; justify-content:center;">
+                <button type="button" class="btn btn-default" style="display:flex; justify-content:center; background-color:#aec72d; color:#ffffff;" onclick="fn_ChargeCard();">Process</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="display:flex; justify-content:center; background-color:#aec72d; color:#ffffff;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+

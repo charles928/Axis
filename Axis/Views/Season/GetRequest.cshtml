@@ -1,0 +1,124 @@
+﻿@model IEnumerable<spSTH_GetRequestUsers_Result>
+@section scripts {
+    <script type="text/javascript">
+        function fn_AddUser(id)
+        {
+            var FullName = $("#UserList option:selected").text();
+            $.ajax({
+                url: "/Season/SendSingleInvite?Request_ID=@ViewBag.Request_ID&FullName=" + FullName,
+                async: false,
+                type: "GET",
+                success: function (response) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Error sending invite ' + thrownError);
+                }
+            });
+        }
+        function fn_Resend(FullName)
+        {
+            $.ajax({
+                url: "/Season/SendSingleInvite?Request_ID=@ViewBag.Request_ID&FullName=" + FullName,
+                async: false,
+                type: "GET",
+                success: function (response) {
+                    alert(response);
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Error sending invite ' + thrownError);
+                }
+            });
+        }
+        function fn_DeleteRequest()
+        {
+            $.ajax({
+                url: "/Season/DeleteRequest?Request_ID=@ViewBag.Request_ID",
+                async: false,
+                type: "GET",
+                success: function (response) {
+                    if (response == "Success") {
+                        window.opener.location.reload();
+                        window.close();
+                    } else {
+                        alert(response);
+                    }
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Error deleting event ' + thrownError);
+                }
+            });
+        }
+        $(document).ready(function () {
+            AccountTable = $('#AccountTable').DataTable({
+                "ordering": true,
+                "scrollY": '40vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "autowidth": false,
+                "order": [[0, "desc"]],
+            });
+
+            //check all replies and if all are Declined then show button
+            var AllDeclined = true;
+            $(".replyitem").each(function (i, obj) {
+                if ($(obj).text() != 'Declined')
+                    AllDeclined = false;
+            });
+            if (AllDeclined)
+                $("#deletebutton").show();
+        });
+    </script>
+}
+<div style="margin:20px; width:800px; max-width:800px;">
+    <div style="margin-left:150px; margin-top:-90px;">
+        <label style="font-size:24pt; color:white;">Scheduled For: @ViewBag.EventDate </label>
+    </div>
+    <div style="margin-left:150px;">
+        <label>Created by @ViewBag.CreatedBy  on @ViewBag.CreatedOn</label>
+    </div>
+    <div style="text-align:center;">
+        <textarea id="MessageText" rows="15" cols="120" style="background-color:lightgray; margin-left:10px; max-width:480px; margin-left:auto; margin-right:auto;">@ViewBag.Message</textarea>
+    </div>
+    <br />
+    <div>
+        <label>Invitations Sent:</label>
+            <table id="AccountTable" class="table-bordered table-condensed" style="width:400px; padding:4px; background-color:white; border-radius:4px;" border="0">
+                <thead>
+                    <tr style="height:30px; border-color:white;">
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Reply</th>
+                        <th>Reply Date</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr id="@item.Login_ID">
+                            <td>@item.Name</td>
+                            <td>@item.Email</td>
+                            <td class="replyitem">@item.Reply</td>
+                            <td>@item.ReplyDate</td>
+                            <td style="text-align:center"><button style="background-color:#adc72e; border-radius:4px;" onclick="fn_Resend('@item.Name');">Resend</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+    </div>
+    <div style="float:left;">
+        <label for="UserList">Add Invitation</label>
+        @Html.DropDownList("UserList", null, new { @class = "RoundedDropDown", @style = "display:inline-block; margin:4px;", @onchange = "fn_AddUser(this.value);" })
+    </div>
+    <dif style="float:right; margin-top:10px; margin-right:10px;">
+        <button id="deletebutton" style="display:none; background-color:red; color:yellow;" onclick="fn_DeleteRequest();">Delete Request</button>
+    </dif>
+</div>
+
+
+
+
+

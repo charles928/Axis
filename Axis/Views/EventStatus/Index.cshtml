@@ -1,0 +1,892 @@
+﻿@model IEnumerable<spGet_EventStatus1_Result>
+@{
+    ViewBag.Title = "Event Status";
+}
+@section scripts {
+    <script type="text/javascript">
+        var Venue_ID = "@Session["esVenue_ID"]";
+        var Parent_ID = "@Session["esParent_ID"]";
+        var vCat_ID;
+        var vPerformer_ID;
+        var CategoryName;
+        var PerformerName;
+        var vSearch = "";
+        var EventStatus1Table;
+        function fn_ExcelExport() {
+            var vStart = $("#esStart").val();
+            var vEnd = $("#esEnd").val();
+            var vSearch = $("#esSearchBox").val();
+            var vCat_ID = $("#ParentList option:selected").val();
+            var vVenue_ID = $("#VenueList option:selected").val();
+            var URL = "../EventStatus/GenerateReport?Start=" + vStart + "&End=" + vEnd + "&Cat_ID=" + vCat_ID + "&Venue_ID=" + vVenue_ID;
+            window.location = URL;
+        }
+        function fn_ExcelExport2() {
+            var vStart = $("#esStart").val();
+            var vEnd = $("#esEnd").val();
+            var vSearch = $("#esSearchBox").val();
+            var vVenue_ID = $("#VenueList option:selected").val();
+            var URL = "../EventStatus/GenerateReport2?Start=" + vStart + "&End=" + vEnd + "&Cat_ID=" + vCat_ID + "&Venue_ID=" + vVenue_ID;
+            window.location = URL;
+        }
+        function fn_ExcelExport3() {
+            var vStart = $("#esStart").val();
+            var vEnd = $("#esEnd").val();
+            var vVenue_ID = $("#VenueList option:selected").val();
+            var URL = "../EventStatus/GenerateReport3?Start=" + vStart + "&End=" + vEnd + "&Cat_ID=" + vCat_ID + "&Performer_ID=" + vPerformer_ID + "&Venue_ID=" + vVenue_ID;
+            window.location = URL;
+        }
+        function fn_ClosePerformerSearch()
+        {
+            $("#PerformerSearchDiv").modal('hide');
+        }
+        function fn_FindPerformer(Performer_ID, PerformerName, CategoryName)
+        {
+            fn_ClosePerformerSearch();
+            vSearch = "";
+            $('#myPleaseWait').modal('show');
+            var vStart = $("#esStart").val();
+            var vEnd = $("#esEnd").val();
+            vCat_ID = $("#hCat_ID_" + Performer_ID).val();
+            var vVenue_ID = 0;
+            var vPerformer_ID = Performer_ID;
+            var URL = "../EventStatus/SearchPerformer";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Start: vStart,
+                    End: vEnd,
+                    Cat_ID: vCat_ID,
+                    Venue_ID: vVenue_ID,
+                    Performer_ID: vPerformer_ID
+                },
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#Level3Title").text(PerformerName);
+                    $("#ButtonReturn").text(CategoryName);
+                    fn_DrawLevel3(result);
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Selecting Category  /" + thrownError);
+                }
+            });
+        }
+        function fn_DrawSearch(result)
+        {
+            var PerformerSearchTable = $("#PerformerSearchTable").DataTable().destroy();
+            $("#PerformerSearchTable tbody").empty();
+            var vPerformerCount = 0;
+            var vEventCount = 0;
+            var vAvailableQty = 0;
+            var vSoldQty = 0;
+            $.each(result, function (key, value) {
+                vPerformerCount += 1;
+                vEventCount += value.Events;
+                vAvailableQty += value.Unsold;
+                vSoldQty += value.Sold;
+                var NewRec = "<tr id='Performer_" + value.performer_id + "' onclick=\"fn_FindPerformer(" + value.performer_id + ", '" + value.performer_name + "', '" + value.Category + "');\"><td><input type='hidden' id='hCat_ID_"+ value.performer_id +"' value=" + value.Cat_ID + " />" + value.Category + "</td><td>" + value.performer_name + "</td><td style='text-align:right;'>" + value.Events + "</td><td style='text-align:right;'>" + value.Sold + "</td><td style='text-align:right;'>" + value.Unsold + "</td></tr>";
+                $("#PerformerSearchTable > tbody").append(NewRec);
+            })
+            $('#myPleaseWait').modal('hide');
+            if ($("#PerformerSearchDiv").is(':hidden'))
+                $("#PerformerSearchDiv").modal('show');
+            $("#PerformerSearchTable").show();
+            var PerformerSearchTable = $('#PerformerSearchTable').DataTable({
+                "destroy": true,
+                "scrollY": '300px',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "autoWidth": true,
+                "info": false,
+                "footerCallback": function (tfoot, data, start, end, display) {
+                    $(tfoot).find('th').eq(0).html(vPerformerCount + " Performers");
+                    $(tfoot).find('th').eq(1).html(vEventCount);
+                    $(tfoot).find('th').eq(2).html(vSoldQty);
+                    $(tfoot).find('th').eq(3).html(vAvailableQty);
+                }
+            });
+            PerformerSearchTable
+                 .rows()
+                 .nodes()
+                 .to$()
+                 .addClass('TableTr');
+            setTimeout(function () {
+                PerformerSearchTable.columns.adjust().draw();
+            }, 500);
+        }
+        function doSearch() {
+            var Search = $("#esSearchBox").val();
+            if (Search != vSearch && Search.length > 2) {
+                $("#VenueList").val(0); // Reset Venue List to ALL
+                var Search = $("#esSearchBox").val();
+                var Start = $("#esStart").val();
+                var End = $("#esEnd").val();
+                var Title = 'Search for [' + Search + '] From: ' + Start + '  To: ' + End;
+                vSearch = Search;
+                $('#myPleaseWait').modal('show');
+                setTimeout(function () {
+                    var URL = "../EventStatus/Search";
+                    $.ajax({
+                        type: 'POST',
+                        data: {
+                            Start: Start,
+                            End: End,
+                            Search: Search
+                        },
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            $("#PerformerSearchTitle").text(Title);
+                            $("#esSearchBox").val('');
+                            fn_DrawSearch(result);
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            alert("Error: Searching Event Status /" + thrownError);
+                            $("#myPleaseWait").modal('hide');
+                        }
+                    });
+                }, 500);
+            }
+        }
+        function doDelayedSearchES(e) {
+            if (e.key == 'Enter')
+                doSearch(); //this is your existing function
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(function () {
+                doSearch(); //this is your existing function
+            }, 2000);
+        }
+        function launchApplication(l_url, l_windowName) {
+            if (typeof launchApplication.winRefs == 'undefined') {
+                launchApplication.winRefs = {};
+            }
+            if (typeof launchApplication.winRefs[l_windowName] == 'undefined' || launchApplication.winRefs[l_windowName].closed) {
+                var l_width = screen.availWidth;
+                var l_height = screen.availHeight;
+
+                var l_params = 'status=1' +
+                               ',resizable=1' +
+                               ',scrollbars=1' +
+                               ',width=' + l_width +
+                               ',height=' + l_height +
+                               ',left=0' +
+                               ',top=0';
+
+                launchApplication.winRefs[l_windowName] = window.open(l_url, l_windowName);//, l_params);
+                launchApplication.winRefs[l_windowName].moveTo(0, 0);
+                launchApplication.winRefs[l_windowName].resizeTo(l_width, l_height);
+            } else {
+                launchApplication.winRefs[l_windowName].focus()
+            }
+        }
+        function fn_SelectEvent(event_name, event_id) {
+            var Url = "../Inventory/Index?Event_ID=" + event_id + "&PO_ID=0";
+            launchApplication(Url, event_name);
+        }
+        function fn_ReturnLevel1() {
+            $("#Level3Div").modal('hide');
+            fn_ShowCategory(vCat_ID);
+        }
+        function fn_DrawLevel3(result) {
+            foot = result.length + " events found.";
+            EventCount = 0;
+            UnsoldQty = 0;
+            SoldQty = 0;
+            UnsoldCost = 0;
+            SoldCost = 0;
+            UnsoldPrice = 0;
+            SoldPrice = 0;
+            SoldPrice2 = 0;
+            var Level3Table = $("#Level3Table").DataTable().destroy();
+            $("#Level3Table tbody").empty();
+            $.each(result, function (key, value) {
+                EventCount += 1;
+                UnsoldQty += parseInt(value.Unsold);
+                SoldQty += parseInt(value.Sold);
+                UnsoldCost += parseFloat(value.UnsoldCost);
+                SoldCost += parseFloat(value.SoldCost);
+                UnsoldPrice += parseFloat(value.UnsoldPrice);
+                SoldPrice += parseFloat(value.SoldPrice);
+                SoldPrice2 += parseFloat(value.SoldPrice2);
+                var NewRec = "<tr><td><input type='hidden' id='HPerformer_" + value.performer_id + "' value='" + value.performer_name + "' />";
+                NewRec += "<a href=\"#\" class=\"TableLink\" onclick=\"fn_SelectEvent('" + value.event_name + "'," + value.event_id + ");\">" + value.event_name + "</a></td>";
+                NewRec += "<td>" + value.event_date + "</td>";
+                NewRec += "<td style='text-align:right;'>" + value.Unsold + "</td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(value.UnsoldCost) + "</td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(value.UnsoldPrice) + "</td>";
+                NewRec += "<td style='text-align:right;'>" + value.Sold + "</td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(value.SoldCost) + "</td>";
+                if (value.SoldPrice == value.SoldPrice2)
+                    NewRec += "<td style='text-align:right;'>" + formatCurrency(value.SoldPrice) + "</td>";
+                else
+                    NewRec += "<td style='text-align:right;'><a href='#' style='color:blue;' title='Price including Category & Consign (not suitable for profit calculations) = " + formatCurrency(value.SoldPrice2) + "' >" + formatCurrency(value.SoldPrice) + "</a></td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(parseFloat(value.SoldPrice) - parseFloat(value.SoldCost)) + "</td>";
+                NewRec += "<td style='text-align:right;'>" + value.SoldMargin + "%</td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(parseFloat(value.SoldPrice) - parseFloat(value.SoldCost) - parseFloat(value.UnsoldCost)) + "</td>";
+                NewRec += "<td style='text-align:right;'>" + value.Margin + "%</td>";
+                NewRec += "<td>" + value.sort_date + "</td></tr>";
+                $("#Level3Table > tbody").append(NewRec);
+            })
+            var Margin2;
+            if (parseFloat(SoldCost) == 0) {
+                if (parseFloat(SoldPrice) == 0) {
+                    Margin2 = 0.00;
+                } else {
+                    Margin2 = 100;
+                }
+            } else {
+                if (SoldPrice == 0) {
+                    Margin2 = 0.00;
+                } else {
+                    if (parseFloat(SoldPrice) > parseFloat(SoldCost)) {
+                        if (parseFloat(SoldPrice) == 0) {
+                            Margin2 = 0.00;
+                        } else {
+                            Margin2 = Math.round((parseFloat(SoldPrice) - parseFloat(SoldCost)) / parseFloat(SoldPrice) * 10000) / 100;
+                        }
+                    } else {
+                        if (parseFloat(SoldCost) == 0) {
+                            Margin2 = 0.00;
+                        } else {
+                            Margin2 = Math.round((parseFloat(SoldPrice) - parseFloat(SoldCost)) / parseFloat(SoldCost) * 10000) / 100;
+                        }
+                    }
+                }
+            }
+            var Margin;
+            if (parseFloat(SoldCost) + parseFloat(UnsoldCost) == 0) {
+                if (parseFloat(SoldPrice) == 0) {
+                    Margin = 0.00;
+                } else {
+                    Margin = 100;
+                }
+
+            } else {
+                if (SoldPrice == 0) {
+                    Margin = 0.00;
+                } else {
+                    if (parseFloat(SoldPrice) > parseFloat(UnsoldCost) + parseFloat(SoldCost)) {
+                        if (parseFloat(SoldPrice) == 0) {
+                            Margin = 0.00;
+                        } else {
+                            Margin = Math.round((parseFloat(SoldPrice) - parseFloat(UnsoldCost) - parseFloat(SoldCost)) / parseFloat(SoldPrice) * 10000) / 100;
+                        }
+                    } else {
+                        if (parseFloat(UnsoldCost) + parseFloat(SoldCost) == 0) {
+                            Margin = 0.00;
+                        } else {
+                            Margin = Math.round((parseFloat(SoldPrice) - parseFloat(UnsoldCost) - parseFloat(SoldCost)) / (parseFloat(UnsoldCost) + parseFloat(SoldCost)) * 10000) / 100;
+                        }
+                    }
+                }
+            }
+            $("#Level3Div").modal('show');
+            var Level3Table = $('#Level3Table').DataTable({
+                "destroy": true,
+                "autoWidth": true,
+                "ordering": true,
+                "scrollY": '57vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "order": [[1, "asc"]],
+                "columnDefs": [
+                    { targets: [12], visible: false },
+                    { iDataSort: 12, targets: [1] }
+                ],
+                "footerCallback": function (tfoot, data, start, end, display) {
+                    $(tfoot).find('th').eq(0).html(EventCount + " Events");
+                    $(tfoot).find('th').eq(1).html(UnsoldQty);
+                    $(tfoot).find('th').eq(2).html(formatCurrency(UnsoldCost));
+                    $(tfoot).find('th').eq(3).html(formatCurrency(UnsoldPrice));
+                    $(tfoot).find('th').eq(4).html(SoldQty);
+                    $(tfoot).find('th').eq(5).html(formatCurrency(SoldCost));
+                    if (parseFloat(SoldPrice) == parseFloat(SoldPrice2))
+                        $(tfoot).find('th').eq(6).html(formatCurrency(SoldPrice));
+                    else
+                        $(tfoot).find('th').eq(6).html("<a href='#' style='color:yellow;' title='Price including Category & Consign (not suitable for profit calculations) = " + formatCurrency(SoldPrice2) + "' >" + formatCurrency(SoldPrice) + "</a>");
+                    $(tfoot).find('th').eq(7).html(formatCurrency(parseFloat(SoldPrice) - parseFloat(SoldCost)));
+                    $(tfoot).find('th').eq(8).html(Margin2 + "%");
+                    $(tfoot).find('th').eq(9).html(formatCurrency(parseFloat(SoldPrice) - parseFloat(SoldCost) - parseFloat(UnsoldCost)));
+                    $(tfoot).find('th').eq(10).html(Margin + "%");
+                }
+            });
+            setTimeout(function () {
+                $('#myPleaseWait').modal('hide');
+                setTimeout(function () {
+                    Level3Table.columns.adjust().draw();
+                }, 250);
+            }, 250);
+        }
+        function fn_ShowPerformer(Performer_ID) {
+            $('#myPleaseWait').modal('show');
+            var vStart = $("#esStart").val();
+            var vEnd = $("#esEnd").val();
+            var vVenueID = $("#VenueList").val();
+            vPerformer_ID = Performer_ID;
+            var URL = "../EventStatus/Level3";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Start: vStart,
+                    End: vEnd,
+                    Venue_ID: vVenueID,
+                    Performer_ID: Performer_ID
+                },
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#Level2Div").modal('hide');
+                    PerformerName = $("#HPerformer_" + Performer_ID).val();
+                    $("#Level3Title").text(PerformerName);
+                    $("#ButtonReturn").text(CategoryName);
+                    fn_DrawLevel3(result);
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Selecting Category  /" + thrownError);
+                }
+            });
+        }
+        function fn_DrawLevel2(result) {
+            foot = result.length + " performers found.";
+            PerformerCount = 0;
+            EventCount = 0;
+            UnsoldQty = 0;
+            SoldQty = 0;
+            UnsoldCost = 0;
+            SoldCost = 0;
+            UnsoldPrice = 0;
+            SoldPrice = 0;
+            SoldPrice2 = 0;
+            var Level2Table = $("#Level2Table").DataTable().destroy();
+            $("#Level2Table tbody").empty();
+            $.each(result, function (key, value) {
+                PerformerCount += 1;
+                EventCount += parseInt(value.Events);
+                UnsoldQty += parseInt(value.Unsold);
+                SoldQty += parseInt(value.Sold);
+                UnsoldCost += parseFloat(value.UnsoldCost);
+                SoldCost += parseFloat(value.SoldCost);
+                UnsoldPrice += parseFloat(value.UnsoldPrice);
+                SoldPrice += parseFloat(value.SoldPrice);
+                SoldPrice2 += parseFloat(value.SoldPrice2);
+                var NewRec = "<tr><td><input type='hidden' id='HPerformer_"+value.performer_id+"' value='"+value.performer_name+"' /><a href=\"#\" class=\"TableLink\" onclick=\"fn_ShowPerformer(" + value.performer_id + ");\">" + value.performer_name + "</a></td>";
+                NewRec += "<td style='text-align:right;'>" + value.Events + "</td>";
+                NewRec += "<td style='text-align:right;'>" + value.Unsold + "</td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(value.UnsoldCost) + "</td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(value.UnsoldPrice) + "</td>";
+                NewRec += "<td style='text-align:right;'>" + value.Sold + "</td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(value.SoldCost) + "</td>";
+                if (value.SoldPrice == value.SoldPrice2)
+                    NewRec += "<td style='text-align:right;'>" + formatCurrency(value.SoldPrice) + "</td>";
+                else
+                    NewRec += "<td style='text-align:right;'><a href='#' style='color:blue;' title='Price including Category & Consign (not suitable for profit calculations) = " + formatCurrency(value.SoldPrice2) + "' >" + formatCurrency(value.SoldPrice) + "</a></td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(parseFloat(value.SoldPrice) - parseFloat(value.SoldCost)) + "</td>";
+                NewRec += "<td style='text-align:right;'>" + value.SoldMargin + "%</td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(parseFloat(value.SoldPrice) - parseFloat(value.SoldCost) - parseFloat(value.UnsoldCost)) + "</td>";
+                NewRec += "<td style='text-align:right;'>" + value.Margin + "%</td></tr>";
+                $("#Level2Table > tbody").append(NewRec);
+            })
+            var Margin2;
+            if (parseFloat(SoldCost) == 0) {
+                if (parseFloat(SoldPrice) == 0) {
+                    Margin2 = 0.00;
+                } else {
+                    Margin2 = 100;
+                }
+            } else {
+                if (SoldPrice == 0) {
+                    Margin2 = 0.00;
+                } else {
+                    if (parseFloat(SoldPrice) > parseFloat(SoldCost)) {
+                        if (parseFloat(SoldPrice) == 0) {
+                            Margin2 = 0.00;
+                        } else {
+                            Margin2 = Math.round((parseFloat(SoldPrice) - parseFloat(SoldCost)) / parseFloat(SoldPrice) * 10000) / 100;
+                        }
+                    } else {
+                        if (parseFloat(SoldCost) == 0) {
+                            Margin2 = 0.00;
+                        } else {
+                            Margin2 = Math.round((parseFloat(SoldPrice) - parseFloat(SoldCost)) / parseFloat(SoldCost) * 10000) / 100;
+                        }
+                    }
+                }
+            }
+            var Margin;
+            if (parseFloat(SoldCost) + parseFloat(UnsoldCost) == 0)
+            {
+                if (parseFloat(SoldPrice) == 0)
+                {
+                    Margin = 0.00;
+                } else
+                {
+                    Margin = 100;
+                }
+
+            } else
+            {
+                if (SoldPrice == 0)
+                {
+                    Margin = 0.00;
+                } else
+                {
+                    if (parseFloat(SoldPrice) > parseFloat(UnsoldCost) + parseFloat(SoldCost))
+                    {
+                        if (parseFloat(SoldPrice) == 0)
+                        {
+                            Margin = 0.00;
+                        } else
+                        {
+                            Margin = Math.round((parseFloat(SoldPrice) - parseFloat(UnsoldCost) - parseFloat(SoldCost)) / parseFloat(SoldPrice) * 10000) / 100;
+                        }
+                    } else
+                    {
+                        if (parseFloat(UnsoldCost) + parseFloat(SoldCost) == 0)
+                        {
+                            Margin = 0.00;
+                        } else
+                        {
+                            Margin = Math.round((parseFloat(SoldPrice) - parseFloat(UnsoldCost) - parseFloat(SoldCost)) / (parseFloat(UnsoldCost) + parseFloat(SoldCost)) * 10000) / 100;
+                        }
+                    }
+                }
+            }
+            $("#Level2Div").modal('show');
+            var Level2Table = $('#Level2Table').DataTable({
+                "destroy": true,
+                "autoWidth": true,
+                "ordering": true,
+                "scrollY": '57vh',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "order": [[0, "asc"]],
+                "footerCallback": function (tfoot, data, start, end, display) {
+                    $(tfoot).find('th').eq(0).html(PerformerCount + " Performers");
+                    $(tfoot).find('th').eq(1).html(EventCount);
+                    $(tfoot).find('th').eq(2).html(UnsoldQty);
+                    $(tfoot).find('th').eq(3).html(formatCurrency(UnsoldCost));
+                    $(tfoot).find('th').eq(4).html(formatCurrency(UnsoldPrice));
+                    $(tfoot).find('th').eq(5).html(SoldQty);
+                    $(tfoot).find('th').eq(6).html(formatCurrency(SoldCost));
+                    if (parseFloat(SoldPrice) == parseFloat(SoldPrice2))
+                        $(tfoot).find('th').eq(7).html(formatCurrency(SoldPrice));
+                    else
+                        $(tfoot).find('th').eq(7).html("<a href='#' style='color:yellow;' title='Price including Category & Consign (not suitable for profit calculations) = " + formatCurrency(SoldPrice2) + "' >" + formatCurrency(SoldPrice) + "</a>");
+                    $(tfoot).find('th').eq(8).html(formatCurrency(parseFloat(SoldPrice) - parseFloat(SoldCost)));
+                    $(tfoot).find('th').eq(9).html(Margin2 + "%");
+                    $(tfoot).find('th').eq(10).html(formatCurrency(parseFloat(SoldPrice) - parseFloat(SoldCost) - parseFloat(UnsoldCost)));
+                    $(tfoot).find('th').eq(11).html(Margin + "%");
+                }
+            })
+            setTimeout(function () {
+                $('#myPleaseWait').modal('hide');
+                setTimeout(function () {
+                    Level2Table.columns.adjust().draw();
+                }, 250);
+            }, 250);
+        }
+        function fn_ShowCategory(Cat_ID)
+        {
+            $('#myPleaseWait').modal('show');
+            vCat_ID = Cat_ID;
+            var vStart = $("#esStart").val();
+            var vEnd = $("#esEnd").val();
+            var vVenueID = $("#VenueList").val();
+            var vParentID = $("#ParentList").val();
+            var URL = "../EventStatus/Level2";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Start: vStart,
+                    End: vEnd,
+                    Venue_ID: vVenueID,
+                    Parent_ID: vParentID,
+                    Cat_ID: Cat_ID
+                },
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    CategoryName = $("#HCategory_" + Cat_ID).val();
+                    $("#Level2Title").text(CategoryName);
+                    fn_DrawLevel2(result);
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Selecting Category  /" + thrownError);
+                }
+            });
+        }
+        function fn_ChangeParent() {
+            $('#myPleaseWait').modal('show');
+            var vParentID = $("#ParentList").val();
+            var URL = "../EventStatus/UpdateParent?Parent_ID=" + vParentID;
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function () {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Parent /" + thrownError);
+                }
+            });
+        }
+        function fn_ChangeVenue() {
+            $('#myPleaseWait').modal('show');
+            var vVenueID = $("#VenueList").val();
+            var URL = "../EventStatus/UpdateVenue?Venue_ID=" + vVenueID;
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function () {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Venue /" + thrownError);
+                }
+            });
+        }
+        function fn_ChangeStart() {
+            $('#myPleaseWait').modal('show');
+            var vStart = $("#esStart").val();
+            var URL = "../EventStatus/UpdateStart?Date=" + vStart;
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function () {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Start Date /" + thrownError);
+                }
+            });
+        }
+        function fn_ChangeEnd() {
+            $('#myPleaseWait').modal('show');
+            var vEnd = $("#esEnd").val();
+            var URL = "../EventStatus/UpdateEnd?Date=" + vEnd;
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function () {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating End Date /" + thrownError);
+                }
+            });
+        }
+        $(document).ready(function () {
+            $(".NavBar").css("background-color", "");
+            $("#ES").css("background-color", "#353535");
+
+            if ($(window).width() > 1135) {
+                $("#IconBar2").show();
+                $("#wrapper").toggleClass("toggled");
+            } else
+                $("#IconBar").show();
+            $("#SearchWrapper3").css("display", "inline-block");
+            $("#LoginWrapper").show();
+            $("#VenueList").val(Venue_ID);
+            $("#ParentList").val(Parent_ID);
+
+            EventStatus1Table = $('#EventStatus1Table').DataTable({
+                ordering: true,
+                scrollY: "57vh",
+                scrollX: false,
+                scrollCollapse: true,
+                lenghtChange: true,
+                paging: false,
+                searching: false,
+                info: false,
+                "columnDefs": [
+                    { targets: [13, 14, 15, 16], visible: false },
+                    { iDataSort: 13, targets: [9] },
+                    { iDataSort: 14, targets: [10] },
+                    { iDataSort: 15, targets: [11] },
+                    { iDataSort: 16, targets: [12] }
+                ],
+            });
+
+            window.onresize = function () {
+                EventStatus1Table.columns.adjust().draw();
+                //Level2Table.columns.adjust().draw();
+                //Level3Table.columns.adjust().draw();
+                //PerformerSearchTable.columns.adjust().draw();
+            }
+        });
+    </script>
+}
+
+<div id="EventStatus1Div" style="width:99%; height:72vh; margin-left:10px; margin-right:10px; margin-top:0px; border-radius:4px; background-color:rgba(0,84,159,0.1); float:left; display:block;">
+    <table id="EventStatus1Table" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+        <thead>
+            <tr>
+                <th colspan="3" style="background-color: rgba(0,0,0,0.075); color:white; text-align:left;">
+                    <img src="~/Images/ExcelIcon.png" style="text-align:left; height:25px; margin-right:20px;" onclick="fn_ExcelExport();" />
+                    @Html.DropDownList("ParentList", null, new { @style="color:black; font-weight:100;", @class = "RoundedDropDown", @id = "ParentList", @onchange = "fn_ChangeParent();" })
+                    @Html.DropDownList("VenueList", null, new { @style = "color:black; font-weight:100; max-width:120px;", @class = "RoundedDropDown", @id = "VenueList", @onchange = "fn_ChangeVenue();" })
+                </th>
+                <th colspan="3" style="background-color: rgb(53,53,53); color:white; text-align:center;">Unsold</th>
+                <th colspan="5" style="background-color: rgb(53,53,53); color:white; text-align:center;">Sold</th>
+                <th colspan="2" style="background-color: rgb(53,53,53); color:white; text-align:center;">Total</th>
+            </tr>
+            <tr style="height:30px;">
+                <th>Category</th>
+                <th>Performers</th>
+                <th>Events</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Qty</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Cost</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Price</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Qty</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Cost</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Price</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Profit</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Margin</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Profit</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Margin</th>
+                <th>ProfitSort1</th>
+                <th>MarginSort1</th>
+                <th>ProfitSort2</th>
+                <th>MarginSort2</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td><input type="hidden" id="HCategory_@item.Cat_ID" value="@item.Category" /><a href="#" onclick="fn_ShowCategory(@item.Cat_ID, false);">@item.Category</a></td>
+                    <td style="text-align:right">@item.Performers</td>
+                    <td style="text-align:right">@item.Events</td>
+                    <td style="text-align:right">@String.Format("{0:#,###}", item.Unsold)</td>
+                    <td style="text-align:right">@String.Format("{0:c}", item.UnsoldCost)</td>
+                    <td style="text-align:right">@String.Format("{0:c}", item.UnsoldPrice)</td>
+                    <td style="text-align:right">@String.Format("{0:#,###}", item.Sold)</td>
+                    <td style="text-align:right">@String.Format("{0:c}", item.SoldCost)</td>
+                    <td style="text-align:right">
+                    @if (item.SoldPrice == item.SoldPrice2)
+                    {
+                        @String.Format("{0:c}", item.SoldPrice)
+                    } else {
+                        <a href="#" style="color:blue; " title="Price including Unsettled Consign & Category @string.Format("{0:c}", item.SoldPrice2)">@String.Format("{0:c}", item.SoldPrice)</a>
+                    }
+                    </td>
+                    <td style="text-align:right">@String.Format("{0:c}", item.SoldPrice - item.SoldCost)</td>
+                    <td style="text-align:right">@String.Format("{0:###.##}", item.SoldMargin)%</td>
+                    <td style="text-align:right">@String.Format("{0:c}", item.SoldPrice - item.SoldCost - item.UnsoldCost)</td>
+                    <td style="text-align:right">@String.Format("{0:###.##}", item.Margin)%</td>
+                    <td>@(item.SoldPrice - item.SoldCost)</td>
+                    <td>@item.SoldMargin</td>
+                    <td>@(item.SoldPrice - item.SoldCost - item.UnsoldCost)</td>
+                    <td>@item.Margin</td>
+               </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr>
+                <th>@String.Format("{0:#,###}", ViewData["fCount"]) Items</th>
+                <th style="text-align:right;">@String.Format("{0:#,###}", ViewData["fPerformers"])</th>
+                <th style="text-align:right;">@String.Format("{0:#,###}", ViewData["fEvents"])</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:#,###}", ViewData["fUnsoldQty"])</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:c}", ViewData["fUnsoldCost"])</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:c}", ViewData["fUnsoldPrice"])</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:#,###}", ViewData["fSoldQty"])</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:c}", ViewData["fSoldCost"])</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;"><a href="#" style="color:yellow;" title="@ViewData["fSoldPrice2"]" >@String.Format("{0:c}", ViewData["fSoldPrice"])</a></th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:c}", ViewData["fSoldProfit"])</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:###.##}", ViewData["fSoldMargin"])%</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:c}", ViewData["fProfit"])</th>
+                <th style="background-color: rgb(53,53,53); color:white; text-align:right;">@String.Format("{0:###.##}", ViewData["fMargin"])%</th>
+                <th colspan="4"></th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+<div class="modal loadingModal" id="Level2Div" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius:6px; width:950px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="display:block; height:70px; margin-left:5px; float:left;">
+                    <img src="~/Images/ExcelIcon.png" style="text-align:left; margin-top:10px;  margin-right:20px; float:left;" onclick="fn_ExcelExport2();" />
+                </div>
+                <div style="display:block; height:70px; margin-left:5px; float:left;">
+                    <label id="Level2Title" class="-Info" style="text-align:left; color:white; float:left;">Nothing Found</label>
+                </div>
+                <div style="display:block; margin:10px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="Level2Table" class="table-responsive table-bordered table-condensed" style="width:100%; border-color:white;">
+                    <thead>
+                        <tr>
+                            <th colspan="2" style="border-top:none;"></th>
+                            <th colspan="3" style="background-color: rgb(53,53,53); color:white; text-align:center;">Unsold</th>
+                            <th colspan="5" style="background-color: rgb(53,53,53); color:white; text-align:center;">Sold</th>
+                            <th colspan="2" style="background-color: rgb(53,53,53); color:white; text-align:center;">Total</th>
+                        </tr>
+                        <tr style="height:30px;">
+                            <th>Performer</th>
+                            <th>Events</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Qty</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Cost</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Price</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Qty</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Cost</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Price</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Profit</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Margin</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Profit</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Margin</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr>
+                            <th></th>
+                            <th style="text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="Level3Div" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius:6px; width:950px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="display:block; height:70px; margin-left:5px; float:left;">
+                    <img src="~/Images/ExcelIcon.png" style="text-align:left; margin-top:10px;  margin-right:20px; float:left;" onclick="fn_ExcelExport3();" />
+                </div>
+                <div style="display:block; height:70px; margin-left:5px; float:left;">
+                    <h1 id="Level3Title" class="-Info" style="color:white; float:left;">Nothing Found</h1>
+                </div>
+                <div style="display:block; margin:10px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" id="ButtonReturn" style="background-color:#aec72d; color:#ffffff;" onclick="fn_ReturnLevel1(vCat_ID);">Return</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="Level3Table" class="table-responsive table-bordered table-condensed" style="border-color:white;">
+                    <thead>
+                        <tr>
+                            <th colspan="2" style="border-top:none;"></th>
+                            <th colspan="3" style="background-color: rgb(53,53,53); color:white; text-align:center;">Unsold</th>
+                            <th colspan="5" style="background-color: rgb(53,53,53); color:white; text-align:center;">Sold</th>
+                            <th colspan="2" style="background-color: rgb(53,53,53); color:white; text-align:center;">Total</th>
+                            <th></th>
+                        </tr>
+                        <tr style="height:30px;">
+                            <th>Event</th>
+                            <th>Date</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Qty</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Cost</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Price</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Qty</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Cost</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Price</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Profit</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Margin</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Profit</th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:center;">Margin</th>
+                            <th>SortDate</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="2"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th style="background-color: rgb(53,53,53); color:white; text-align:right;"></th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="PerformerSearchDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="margin-left:10px; max-width:80%; float:left;">
+                    <label id="PerformerSearchTitle" style="height:16px; font-size:24px; font-weight:500; line-height:1.23; color:#ffffff; max-width:80%; float:left;">Put Title Here</label>
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_ClosePerformerSearch();">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table id="PerformerSearchTable" class="table-responsive table-bordered table-condensed" style="border-color:white; display:none;">
+                    <thead>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th class="TableTh">Category</th>
+                            <th class="TableTh">Performer</th>
+                            <th class="TableTh">Events</th>
+                            <th class="TableTh">Sold</th>
+                            <th class="TableTh">Unsold</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr style="border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                            <th class="TableTh" colspan="2"></th>
+                            <th class="TableTh" style="text-align:right"></th>
+                            <th class="TableTh" style="text-align:right"></th>
+                            <th class="TableTh" style="text-align:right"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+

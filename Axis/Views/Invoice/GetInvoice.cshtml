@@ -1,0 +1,376 @@
+﻿<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Invoice @ViewData["Invoice"]</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <script src="/Scripts/jquery-3.3.1.js"></script>
+    <script type="text/javascript" src="https://github.com/niklasvh/html2canvas/releases/download/0.4.1/html2canvas.js"></script>
+
+    <script type="text/javascript">
+        function fn_print() {
+            $("#OptionDiv").hide();
+            window.print();
+        }
+        function fn_address() {
+            $("#OptionDiv").hide();
+            $("#EmailDiv").show();
+            $("#EmailAddress").focus();
+            $("#EmailAddress").select();
+        }
+        function fn_email() {
+            var URL = "../Invoice/EmailRequest";
+            var Invoice = @ViewData["Invoice"];
+            var Address = $("#EmailAddress").val();
+            $("#EmailDiv").hide();
+            setTimeout(function () {
+                html2canvas($(".currentpage"), {
+                    onrendered: function (canvas) {
+                        var imagedata = canvas.toDataURL('image/png');
+                        var imgdata = imagedata.replace(/^data:image\/(png|jpg);base64,/, "");
+                        $.ajax({
+                            type: 'POST',
+                            data: {
+                                Invoice_ID: Invoice,
+                                Address: Address,
+                                Data: imgdata
+                            }, cache: false,
+                            aysnc: false,
+                            url: URL,
+                            success: function (result) {
+                                alert('Email sent to: ' + Address);
+                            },
+                            error: function (xhr, ajaxOptions, thrownError) {
+                                alert("Error: Emailing Invoice /" + thrownError);
+                            }
+                        });
+                    }
+                });
+            }, 250);
+        }
+        function fn_AutoPrint() {
+            var URL = "../Invoice/AutoPrint";
+            html2canvas($(".currentpage"), {
+                onrendered: function (canvas) {
+                    var imagedata = canvas.toDataURL('image/png');
+                    var imgdata = imagedata.replace(/^data:image\/(png|jpg);base64,/, "");
+                    $.ajax({
+                        type: 'POST',
+                        data: {
+                            Invoice_ID: @ViewData["Invoice"],
+                            Data: imgdata
+                        }, cache: false,
+                        aysnc: false,
+                        url: URL,
+                   });
+                }
+            });
+        }
+            $(document).ready(function () {
+                if ("@ViewData["Stamp"]" == "PAID")
+                    $("#DueDate").hide();
+            setTimeout(function () {
+                if ('@ViewData["AutoPrint"]' == 'True')
+                    fn_AutoPrint();
+            }, 250);
+        });
+    </script>
+</head>
+<body>
+    <div style="text-align:center; width:100%;">
+        <div style="margin:0 auto; width:800px; margin: 0 auto; ">
+            <div class="currentpage" style="margin-top:20px; margin-bottom:20px; width:800px; float:left;">
+                <div class="currentpage" style="width:100%; margin:0 auto; background-color: white;  float:left;">
+                    <div class="currentpage" style="position:absolute; margin-top:100px; margin-left:@ViewData["StampLoc"];">
+                        <label style="font-size:45px; padding-top:1px; padding-bottom:1px; padding-left:18px; padding-right:18px; color:red; border:solid; display:@ViewData["StampDisplay"];">@ViewData["Stamp"]</label>
+                    </div>
+                    <div class="currentpage" style="display:table; width:100%; float:left;">
+                        <div class="currentpage" style="display:flex; margin-right:20px; float:left;" onclick="$('#OptionDiv').show();">
+                            <img id="logo" src="~/Images/360Logo.png" style="height:100px; background-color:transparent; margin-top:20px; margin-left:0px;" />
+                        </div>
+                        <div class="currentpage" style="display:flex; margin-right:20px; float:right;">
+                            <table class="table-condensed" style="font-weight:600;" border="0">
+                                <tr><td>360 Access</td></tr>
+                                <tr><td>5912 Balcones Drive</td></tr>
+                                <tr><td>Suite 102</td></tr>
+                                <tr><td>Austin, TX 78731</td></tr>
+                                <tr><td>Phone: (800)521-9616</td></tr>
+                                <tr><td>Email: Orders@360Access.com</td></tr>
+                                <tr><td style="font-weight:100;">Salesperson:&nbsp;@ViewData["Agent"]</td></tr>
+                            </table>
+                        </div>
+                        <div class="currentpage" style="display:table; margin-top:10px; width:100%; float:left;">
+                            <div class="currentpage" style="display:flex; margin-left:25px; float:left;"><label style="font-weight:600;">Sales Date:@ViewData["SalesDate"]</label></div>
+                            <div class="currentpage" style="display:flex; float:right; text-align:right;">
+                                <label style="font-weight:600; font-size:24px; margin-right:10px;">Invoice #:@ViewData["Invoice"]</label>
+                                <img style="margin-right:10px; width:150px;" src="@ViewData["Barcode"]" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="currentpage" style="display:table; width:100%; margin-top:10px; float:left;">
+                        <div class="currentpage" style="display:table; width:50%; text-align:center; float:left;">
+                            <div class="currentpage" style="display:inline-block; margin:auto 0;">
+                                <div class="currentpage" style="display:table; text-align:center; margin:auto;"><label style="font-weight:600;">BILL TO</label></div>
+                                <div class="currentpage" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:flex; border:solid; border-width:1px; float:left;">
+                                    <table id="BillToTable" class="table-condensed" style="margin:1px; min-width:330px;">
+                                        <tbody>
+                                            @foreach (var item in (List<spGet_InvoiceBillTo_Result>)ViewData["BillTo"])
+                                            {
+                                                <tr><td style="text-align:left; padding:2px;">@item.Company</td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;">@item.Name</td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;">@item.street_address1</td></tr>
+                                                    <tr><td style='text-align:left; padding:2px;'>@item.street_address2</td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;">@item.city,&nbsp;@item.state_name&nbsp;&nbsp;@item.postal_code</td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;">@item.country</td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;"><div style="width:102%; margin-left:-1%; border-top:solid; border-width:1px; padding-left:1%;">Email:&nbsp;@item.client_broker_email</div></td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;"><div style="width:102%; margin-left:-1%; border-top:solid; border-width:1px; padding-left:1%;">Customer&nbsp;ID:&nbsp;@item.customer_id</div></td></tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="currentpage" style="display:table; width:50%; text-align:center; float:left;">
+                            <div class="currentpage" style="display:inline-block; margin:auto 0;">
+                                <div class="currentpage" style="display:table; text-align:center; margin:auto;"><label style="font-weight:600;">SHIP TO</label></div>
+                                <div class="currentpage" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:flex; border:solid; border-width:1px; float:left;">
+                                    <table id="CustomerTable" class="table-condensed" style="margin:1px; min-width:330px; border-color:white;">
+                                        <tbody>
+                                            @foreach (var item in (List<spGet_InvoiceShipTo_Result>)ViewData["ShipTo"])
+                                            {
+                                                <tr><td style="text-align:left; padding:2px;">@item.name</td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;">@item.street_address1</td></tr>
+                                                    <tr><td style='text-align:left; padding:2px;'>@item.street_address2</td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;">@item.city,&nbsp;@item.state_name&nbsp;&nbsp;@item.postal_code</td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;">@item.country</td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;"><div style="width:102%; margin-left:-1%; border-top:solid; border-width:1px; padding-left:1%;">Shipping&nbsp;Phone:&nbsp;@item.phone</div></td></tr>
+                                                    <tr><td style="text-align:left; padding:2px;"><div style="width:102%; margin-left:-1%; border-top:solid; border-width:1px; padding-left:1%;">@ViewData["DeliveryMethod"]</div></td></tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="currentpage" style="display:table; width:98%; margin-left:10px; text-align:center;">
+                        <div class="currentpage" style="width:100%; border-radius:4px; margin-top:15px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:flex; border:solid; border-width:1px; float:left;">
+                            <table id="InvoiceTable" class="" style="width:100%; padding-left:5px; padding-right:5px;">
+                                <thead>
+                                    <tr style="border-radius: 4px;">
+                                        <th style="text-align:left; border-bottom:solid;">EVENT</th>
+                                        <th style="text-align:left; border-bottom:solid;">DATE</th>
+                                        <th style="text-align:center; border-bottom:solid;">SECTION</th>
+                                        <th style="text-align:center; border-bottom:solid;">ROW</th>
+                                        <th style="text-align:center; border-bottom:solid;">SEATS</th>
+                                        <th style="text-align:right; border-bottom:solid;">QTY</th>
+                                        <th style="text-align:right; border-bottom:solid;">PRICE</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model)
+                                    {
+                                        <tr>
+                                            <td style="text-align:left;">@item.EventName2</td>
+                                            <td style="text-align:left;">@item.EventDate</td>
+                                            <td style="text-align:center;">@item.Section</td>
+                                            <td style="text-align:center;">@item.Row</td>
+                                            <td style="text-align:center;">@item.Seats</td>
+                                            <td style="text-align:right;">@item.Qty</td>
+                                            <td style="text-align:right;">@String.Format("{0:c}", item.Price)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr><th colspan="7" style="border-top:solid black 2px;"></th></tr>
+                                    <tr>
+                                        <th colspan="5" style="text-align:left; height:16px;font-weight:bold;">&nbsp;&nbsp;@ViewData["Items"] Item(s)</th>
+                                        <th style="text-align:right;">@ViewData["Qty"]</th>
+                                        <th style="text-align:right;">@ViewData["Price"]</th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div class="currentpage" style="width:100%; border-top:solid; float:left; margin-top:10px;border-width:1px;"></div>
+                        <div style="width:100%; float:left; margin-top:10px;">
+                            <div class="currentpage" style="width:100%; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:flex; border:solid; border-width:1px; float:left;">
+                                <table id="NotesTable" class="table-condensed" style="margin:1px; width:100%;" border="0">
+                                    <thead><tr><th colspan="2" style="text-align:left">Payment Information</th></tr></thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="4">
+                                                <div class="currentpage" style="width:100%; min-height:1px; margin-left:-3px; margin-right:-3px; border-top:solid; border-width:1px; padding-left:1%; text-align:left;"></div>
+                                            </td>
+                                        </tr>
+                                        @foreach (var item in (List<spGet_InvoicePayment_Result>)ViewData["Payment"])
+                                        {
+                                            <tr>
+                                                <td style="text-align:left;">@item.payment_type_desc</td>
+                                                <td style="text-align:left;">@item.notes</td>
+                                                <td style='text-align:left;'>@item.Date</td>
+                                                <td style="text-align:right;">@String.Format("{0:c}", item.amt)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="currentpage" id="bottom" style="display:table; width:98%; margin-left:10px; text-align:center;">
+                        <div class="currentpage" style="display:table; width:100%; margin-top:10px; float:left;">
+                            <div class="currentpage" id="bottomleft" style="display:table; width:48%; text-align:center; float:left;">
+                                <div class="currentpage" style="display:inline-block; margin:auto 0;">
+                                    <div class="currentpage" style="width:100%; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:flex; border:solid; border-width:1px; float:left;">
+                                        
+                                        <table id="NotesTable" class="table-condensed" style="margin:1px; width:100%;" border="0">
+                                            <thead><tr><th colspan="2" style="text-align:left">Invoice Notes</th></tr></thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td colspan="4">
+                                                        <div style="width:100%; min-height:1px; margin-left:-3px; margin-right:-3px; border-top:solid; border-width:1px; padding-left:1%; text-align:left;"></div>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="text-align:left;">External PO#:&nbsp;@ViewData["ExternalPO"]</td>
+                                                    <td style="text-align:left;">Ticket Request ID#:&nbsp;@ViewData["TicketRequestID"]</td>
+                                                </tr>
+                                                <tr>
+                                                    <td colspan="2">@ViewData["DisplayedNotes"]</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+
+                                    </div>
+                                    <div class="currentpage" style="margin-top:15px; width:100%; border-radius:4px; background-color:#ffffff; display:flex; border:solid; border-width:1px; float:left;">
+                                        <table id="PaymentTable" class="table-condensed" style="margin:1px; width:100%;" border="0">
+                                            <thead><tr><th style="text-align:left">Contact Information</th></tr></thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>
+                                                        <div style="width:100%; min-height:1px; margin-left:-3px; margin-right:-3px; border-top:solid; border-width:1px; padding-left:1%; text-align:left;"></div>
+                                                    </td>
+                                                </tr>
+                                                <tr><td style="text-align:left;">@ViewData["Rep"]</td></tr>
+                                                <tr><td style="text-align:left;">@ViewData["RepPhone"]</td></tr>
+                                                <tr><td style="text-align:left;">Fax</td></tr>
+                                                <tr><td style="text-align:left;">@ViewData["RepNotes"]</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="currentpage" style="margin-top:15px; width:100%; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:flex; border:solid; border-width:1px; float:left;">
+                                        <table id="NotesTable" class="table-condensed" style="margin:1px; width:100%;" border="0">
+                                            <thead><tr><th style="text-align:left">Shipping Notes</th></tr></thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>
+                                                        <div style="width:100%; min-height:30px; margin-left:-3px; border-top:solid; border-width:1px; padding-left:1%; text-align:left;">@ViewData["ShippingNotes"]</div>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <div style="width:100%; min-height:30px; margin-left:-3px; border-top:solid; border-width:1px; padding-left:1%; text-align:left;">@ViewData["StatusDate"]</div>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="currentpage" id="bottomright" style="width:48%; display:table; text-align:center; float:right;">
+                                <div class="currentpage" style="display:inline-block; margin:auto 0; min-width:100%;">
+                                    <div class="currentpage" style="display:table; width:100%; float:right;">
+                                        <table id="PaymentTable" style="width:100%; padding-right:5px;" border="0">
+                                            <tbody>
+                                                <tr style="height:25px;">
+                                                    <th style="text-align:right; font-weight:bold; font-size:14px;">SUBTOTAL:</th>
+                                                    <td style="min-width:250px;">
+                                                        <div class="currentpage" style="width:100%; padding-right:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:inline-block; border:solid; border-width:1px; text-align:right;">
+                                                            @ViewData["Price"]
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr style="height:25px;">
+                                                    <th style="text-align:right; font-weight:bold; font-size:14px;">SHIPPING:</th>
+                                                    <td style="min-width:250px;">
+                                                        <div class="currentpage" style="width:100%; padding-right:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:inline-block; border:solid; border-width:1px; text-align:right;">
+                                                            @ViewData["ShippingTotal"]
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr style="height:25px;">
+                                                    <th style="text-align:right; font-weight:bold; font-size:14px;">TAX:</th>
+                                                    <td style="min-width:250px;">
+                                                        <div class="currentpage" style="width:100%; padding-right:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:inline-block; border:solid; border-width:1px; text-align:right;">
+                                                            @ViewData["TaxTotal"]
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr style="height:25px;">
+                                                    <th style="text-align:right; font-weight:bold; font-size:14px;">OTHER&nbsp;EXPENSES:</th>
+                                                    <td style="min-width:250px;">
+                                                        <div class="currentpage" style="width:100%; padding-right:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:inline-block; border:solid; border-width:1px; text-align:right;">
+                                                            @ViewData["OtherExpensesTotal"]
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr style="height:25px;">
+                                                    <th style="text-align:right; font-weight:bold; font-size:14px;">GRAND&nbsp;TOTAL:</th>
+                                                    <td style="min-width:250px;">
+                                                        <div class="currentpage" style="width:100%; padding-right:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:inline-block; border:solid; border-width:1px; text-align:right;">
+                                                            @ViewData["GrandTotal"]
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr style="height:25px;">
+                                                    <th style="text-align:right; font-weight:bold; font-size:14px;">BALANCE&nbsp;DUE:</th>
+                                                    <td style="min-width:250px;">
+                                                        <div class="currentpage" style="width:100%; padding-right:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:inline-block; border:solid; border-width:1px; text-align:right;">
+                                                            @ViewData["BalanceDue"]
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr id="DueDate" style="height:25px;">
+                                                    <th style="text-align:right; font-weight:bold; font-size:14px;">DUE&nbsp;DATE:</th>
+                                                    <td style="min-width:250px;">
+                                                        <div class="currentpage" style="width:100%; padding-right:5px; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); display:inline-block; border:solid; border-width:1px; text-align:right;">
+                                                            @ViewData["DueDate"]
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="OptionDiv" tabindex="-1" style="margin-top:-19px; width:100%; position:absolute; text-align:center; display:none;">
+        <div style="border-radius:4px; width:265px; margin:0 auto;">
+            <div class="content" style="border-radius:6px;">
+                <div class="header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px; text-align:center;">
+                    <i class="material-icons" style="color:#adc72e; margin-top:0px; font-size:50px; padding:10px;" onclick="fn_print();">print</i>
+                    <i class="material-icons" style="color:#adc72e; margin-top:0px; font-size:50px; padding:10px;" onclick="fn_address();">email</i>
+                    <i class="material-icons" style="color:#adc72e; margin-top:0px; font-size:50px; padding:10px;" onclick="$('#OptionDiv').hide();">close</i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="EmailDiv" tabindex="-1" style="margin-top:0px; width:100%; position:absolute; text-align:center; display:none;">
+        <div style="border-radius:4px; width:400px; margin:0 auto;">
+            <div class="content" style="border-radius:6px; background-color:#1c81db;">
+                <div class="header" style="margin:10px;  height:72px; ">
+                    <h1 id="CSTitle" class="-Info" style="margin-top:17px; color:white; float:left;">Verify Email Address</h1>
+                    <i class="material-icons" style="color:#adc72e; margin-top:0px; font-size:50px; padding:10px;" onclick="$('#EmailDiv').hide();">close</i>
+                </div>
+                <div style="text-align:center;">
+                    <div style="display:block"><input id="EmailAddress" style="font-size:18px; width:300px;" value="@ViewData["EmailAddress"]" /></div>
+                    <i class="material-icons" style="color:#adc72e; font-size:50px; padding:10px;" onclick="fn_email();">send</i>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

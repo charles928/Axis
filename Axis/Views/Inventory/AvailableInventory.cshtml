@@ -1,0 +1,44 @@
+﻿@foreach (var item in (List<spGet_ItemsForEventAvailable_Result>)ViewData["Available"])
+{
+    <tr style='background-color:@item.TRColor' id="ATTR_@item.Listing_ID">
+        <td style="border:none; padding-left:9px;"><input type="hidden" class="TransactionID" value="@item.transaction_id" /><input id="CheckBox_@item.Listing_ID" class="AvailableCheckBox" type="checkbox" onclick="fn_FillPresale(@item.Listing_ID);" /></td>
+        <td id="Section_@item.Listing_ID" style="border:none;">
+            @if (item.Zone == "Unknown")
+            {
+                @Html.DisplayFor(modelitem => item.Section)
+            }
+            else
+            {
+                <a href="#" style="color:blue;" title="@item.Zone">@item.Section</a>
+            }
+        </td>
+        <td id="Row_@item.Listing_ID" style="border:none;">@Html.DisplayFor(modelitem => item.Row)</td>
+        <td id="Seats_@item.Listing_ID" style="border:none;">@Html.DisplayFor(modelitem => item.Seats)</td>
+        <td id="AQty_@item.Listing_ID" style="border:none; text-align:center; color:rgb(0,84,159);" onclick="fn_Split(@item.Listing_ID, @item.Qty, @item.Listing_ID);">@Html.DisplayFor(modelitem => item.Qty)</td>
+        <td id="ACost_@item.Listing_ID" style="border:none; text-align:right; padding-right:10px; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Cost)</td>
+        
+        <td style="border:none;text-align:right; padding-right:4px; background-color:rgba(229,229,229, 0.48);"><input id="Price_@item.Listing_ID" class="Price" style="text-align:right; color:#656565; border:none; width:70px;" value="@String.Format("{0:c}", item.Price)" onclick="fn_SelectValue('Price', @item.Listing_ID);" @(item.Reserved == "#c5c5c5;" ? "" : "disabled='disabled'") /></td>
+        <td style="border:none; text-align:right; padding-right:4px; background-color:rgba(229,229,229, 0.48); padding:4px;"><input id="SHPrice_@item.Listing_ID" style="text-align:right; color:red; border:none; width:70px;" value="@String.Format("{0:c}", item.Price * Convert.ToDecimal(@Session["SHMarkup"]))" onclick="fn_SelectValue('SHPrice', @item.Listing_ID);" @(item.Reserved == "#c5c5c5;" ? "" : "disabled='disabled'") /></td>
+        <td style="border:none;text-align:center; padding-right:4px; background-color:rgba(229,229,229, 0.48); padding:4px;">
+            <div class="NavLine" style="display:inline-flex;">
+                <h1 id="Suggested_@item.Listing_ID" style="margin:10px; font-size:13px; font-weight:500; line-height:1; letter-spacing:0.5px; color:#656565;">?????</h1>
+                <i class="material-icons" style="font-size:18px; line-height:1; color:#959595; float:right;" onclick="fn_Suggested(@item.Listing_ID);" @(item.Reserved == "#c5c5c5;" ? "" : "disabled='disabled'")>refresh</i>
+            </div>
+        </td>
+        <td style="border:none; text-align:center; background-color:rgba(229,229,229, 0.48);"><i id="SH_@item.Listing_ID" class="material-icons" style="font-size:21px; padding-right:0px; color:@item.SH" onclick="fn_ShareClick('SH', @item.Listing_ID);">radio_button_checked</i></td>
+        <td style="border:none; text-align:center; background-color:rgba(229,229,229, 0.48);"><i id="EI_@item.Listing_ID" class="material-icons" style="font-size:21px; padding-right:0px; color:@item.EI" onclick="fn_ShareClick('EI', @item.Listing_ID);">radio_button_checked</i></td>
+        <td style="border:none; text-align:center; background-color:rgba(229,229,229, 0.48);"><i id="VI_@item.Listing_ID" class="material-icons" style="font-size:21px; padding-right:0px; color:@item.VI" onclick="fn_ShareClick('VI', @item.Listing_ID);">radio_button_checked</i></td>
+        <td style="border:none; text-align:center; background-color:rgba(229,229,229, 0.48);"><i id="SG_@item.Listing_ID" class="material-icons" style="font-size:21px; padding-right:0px; color:@item.SG" onclick="fn_ShareClick('SG', @item.Listing_ID);">radio_button_checked</i></td>
+        <td style="border:none; text-align:center; background-color:rgba(229,229,229, 0.48);"><i id="714_@item.Listing_ID" class="material-icons" style="font-size:21px; padding-right:0px; color:@item.C714" onclick="fn_ShareClick('714', @item.Listing_ID);">radio_button_checked</i></td>
+        <td style="border:none; text-align:center; background-color:rgba(229,229,229, 0.48);"><i id="All_@item.Listing_ID" class="material-icons" style="font-size:21px; padding-right:0px; color:@item.AllIcon" onclick="fn_ShareClick('All', @item.Listing_ID);">radio_button_checked</i></td>
+        <td style="border:none; text-align:center;"><i class="material-icons" style="font-size:18px; color:@item.Internal; padding-right:0px;" title="@item.Internal_Notes">sms_failed</i></td>
+        <td style="border:none; text-align:center;"><i class="material-icons" style="font-size:18px; color:@item.DeliveryColor; padding-right:0px;" title="@item.ticket_group_stock_type_desc">@item.DeliveryIcon</i></td>
+        <td style="border:none; text-align:center;"><i class="material-icons" style="font-size:18px; color:@item.AutoIcon; padding-right:0px;">settings</i></td>
+        <td style="border:none; text-align:center;"><i class="material-icons" style="font-size:18px; font-weight:bold; color:@item.Reserved; padding-right:0px;" id="R_Notes_@item.transaction_id" title="@item.Reserved_Notes" onclick="fn_Reserve(@item.Listing_ID, @item.Qty, @item.transaction_id);">alarm_on</i></td>
+        <td style="border:none; text-align:center;"><i class="material-icons" style="font-size:18px; color:#adc72e; padding-right:0px;" onclick="fn_GetDetails(@item.Listing_ID);">more_vert</i></td>
+        <td>@Html.DisplayFor(modelitem => item.Price)</td>
+        <td>@Html.DisplayFor(modelitem => item.Section2)</td>
+        <td>@Html.DisplayFor(modelitem => item.Row2)</td>
+        <td>@Html.DisplayFor(modelitem => item.Zone)</td>
+    </tr>
+}

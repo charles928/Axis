@@ -1,0 +1,91 @@
+﻿@model IEnumerable < spGet_POItems_Result >
+<html>
+    <head>
+        <script src="/Scripts/jquery-3.3.1.js"></script>
+        <script type="text/javascript">
+            function fn_HideShow() {
+                var current = $("#HideShow").text();
+                if (current == "Hide Details") {
+                    $("#HideShow").text("Show Details");
+                    $(".details").hide();
+                } else {
+                    $("#HideShow").text("Hide Details");
+                    $(".details").show();
+                }
+            }
+        </script>
+    </head>
+    <body>
+        <div style="margin:0 auto; width:800px;">
+            <label style="font-size:24pt; font-weight:bold; float:left;">PO# @ViewBag.PO_ID</label>
+            <button id="HideShow" style="float:right;" onclick="fn_HideShow();">Show Details</button>
+        </div>
+        <div style="margin:0 auto; width:800px;">
+            <div id="LeftSide" style="margin-top:15px; width:100%; float:left;">
+                <table style="width:100%; border-collapse:collapse;" border="0">
+                    <thead>
+                        <tr>
+                            <th><label class="details" style="display:none">Section</label></th>
+                            <th><label class="details" style="display:none">Row</label></th>
+                            <th><label class="details" style="display:none">Seats</label></th>
+                            <th style="text-align:right;"><label class="details" style="display:none">Face</label></th>
+                            <th style="text-align:right;"><label class="details" style="display:none">Cost</label></th>
+                            <th style="text-align:right;">Qty</th>
+                            <th style="text-align:right;">TotalCost</th>
+                            <th style="text-align:right;">TotalPrice</th>
+                            <th style="text-align:right;">Profit</th>
+                        </tr>
+                        <tr>
+                            <th colspan="9"><div style="width:100%; min-height:2px; margin-left:-3px; margin-right:-3px; border-top:solid; border-width:2px; padding-left:1%; text-align:left;"></div></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            if (item.Header == 0)
+                            {
+                                <tr><td colspan="9">@item.Qty</td></tr>
+                            }
+                            else
+                            {
+                                if (item.Header == 2)
+                                {
+                                    <tr><th colspan="5" style="text-align:left;">Event Total:</th><th style="text-align:right;">@item.Qty</th><th style="text-align:right;">@String.Format("{0:c}", item.Total)</th><th style="text-align:right;">@String.Format("{0:c}", item.TotalPrice)</th><th style="text-align:right;">@String.Format("{0:c}", item.TotalPrice - item.Total)</th></tr>
+                                    <tr><th colspan="9"><div style="width:100%; min-height:2px; margin-left:-3px; margin-right:-3px; border-top:solid; border-width:2px; padding-left:1%; text-align:left;"></div></th></tr>
+                                }
+                                else
+                                {
+                                    <tr class="details" style="display:none;">
+                                        <td style="text-align:center;">@item.Sections</td>
+                                        <td style="text-align:center;">@item.Row</td>
+                                        <td style="text-align:center;">@item.Seats</td>
+                                        <td style="text-align:right;">@String.Format("{0:c}", item.Face)</td>
+                                        <td style="text-align:right;">@String.Format("{0:c}", item.Cost)</td>
+                                        <td style="text-align:right;">@item.Qty</td>
+                                        <td style="text-align:right;">@String.Format("{0:c}", item.Total)</td>
+                                        <td style="text-align:right;">@String.Format("{0:c}", item.TotalPrice)</td>
+                                        <td style="text-align:right;">@String.Format("{0:c}", item.TotalPrice - item.Total)</td>
+                                    </tr>
+                                }
+                            }
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="9"><div style="width:100%; min-height:2px; margin-left:-3px; margin-right:-3px; border-top:solid; border-width:2px; padding-left:1%; text-align:left;"></div></th>
+                        </tr>
+                        <tr>
+                            <th colspan="5" style="text-align:left;">PO Total</th>
+                            <th style="text-align:right">@ViewBag.TotalQty</th>
+                            <th style="text-align:right">@ViewBag.TotalCost</th>
+                            <th style="text-align:right">@ViewBag.TotalPrice</th>
+                            <th style="text-align:right">@ViewBag.TotalProfit</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </body>
+</html>
+
+

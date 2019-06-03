@@ -1,0 +1,877 @@
+﻿@model IEnumerable<spGet_STHList_Result>
+
+@{
+    ViewBag.Title = "STH Dashboard";
+}
+@section scripts {
+    <script type="text/javascript">
+        var vClient_Broker_ID = 0;
+        var vOldValue = '';
+        var STHTable;
+        var AccountTable;
+        var SearchTable;
+
+        function fn_HideChangePerformer()
+        {
+            $("#Headliner2Div").hide();
+        }
+        function fn_ChangeType(Client_Broker_ID) {
+            var Current = $("#Type_" + Client_Broker_ID).text();
+            var BAction = 6;
+            if (Current == "Season")
+                BAction = 1;
+
+            var URL = "UpdateBroker?ClientBroker_ID=" + Client_Broker_ID;
+            $.ajax({
+                type: 'POST',
+                data: {
+                    BrokerAction: BAction
+                },
+                cache: false,
+                aysnc: true,
+                url: URL,
+                success: function (result) {
+                    if (Current == "Season")
+                        $("#Type_" + Client_Broker_ID).text("Broker");
+                    else
+                        $("#Type_" + Client_Broker_ID).text("Season");
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Type /" + thrownError);
+                }
+            });
+        }
+        function fn_Delete(Client_Broker_ID) {
+            vClient_Broker_ID = Client_Broker_ID;
+            $("#TR_" + Client_Broker_ID).css('background-color', 'pink');
+            setTimeout(function () {
+                var r = confirm('Are you sure you want to delete this broker?');
+                if (r == true) {
+                    $('#myPleaseWait').modal('show');
+                    var URL = "UpdateBroker?ClientBroker_ID=" + vClient_Broker_ID;
+                    $.ajax({
+                        type: 'POST',
+                        data: {
+                            BrokerAction: "6"
+                        },
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            STHTable.destroy();
+                            $("#TR_" + Client_Broker_ID).remove();
+                            STHTable = $('#STHTable').DataTable({
+                                "destroy": true,
+                                "ordering": true,
+                                "scrollY": '70vh',
+                                "scrollX": false,
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "info": false,
+                                "autoWidth": false,
+                                "aoColumnDefs": [
+                                    { targets: [0], sortable: false },
+                                    { targets: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21], visible: false },
+                                    { iDataSort: 12, targets: [1] },
+                                    { iDataSort: 13, targets: [2] },
+                                    { iDataSort: 14, targets: [3] },
+                                    { iDataSort: 15, targets: [4] },
+                                    { iDataSort: 16, targets: [5] },
+                                    { iDataSort: 17, targets: [6] },
+                                    { iDataSort: 18, targets: [7] },
+                                    { iDataSort: 19, targets: [8] },
+                                    { iDataSort: 20, targets: [9] },
+                                    { iDataSort: 21, targets: [10] },
+                                    { "sWidth": "20px", "aTargets": [0, 11] }
+                                ],
+                                "order": [[1, "asc"]]
+                            });
+                            $('#myPleaseWait').modal('hide');
+                            STHTable.draw();
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Updating Broker /" + thrownError);
+                        }
+                    });
+                } else {
+                    $("#TR_" + Client_Broker_ID).css('background-color', '');
+                }
+            }, 250);
+        }
+        function fn_BrokerSearch()
+        {
+            $('#myPleaseWait').modal('show');
+            var URL = "STHSearch?Input=" + $("#SearchInput").val();
+            $.ajax({
+                type: 'GET',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    SearchTable.destroy();
+                    jQuery.each(result, function (index, item) {
+                        var NewRow = "<tr id='TR_" + item.Client_Broker_ID + "'><td style='text-align:center'><a id='Type_" + item.Client_Broker_ID + "' href='#' onclick=\"fn_ChangeType(" + item.Client_Broker_ID + ");\" title=\"" + item.client_broker_fname + "\n" + item.client_broker_lname + "\n" + item.client_broker_company_name + "\" >" + item.Type + "</a></td>";
+                        NewRow += "<td><input id='First_" + item.Client_Broker_ID + "' style=\"background-color:transparent;\" onchange=\"fn_ChangeSearch('First', " + item.Client_Broker_ID + ");\" value=\"" + item.First + "\" ></td>";
+                        NewRow += "<td><input id='Last_" + item.Client_Broker_ID + "' style=\"background-color:transparent;\" onchange=\"fn_ChangeSearch('Last', " + item.Client_Broker_ID + ");\" value=\"" + item.Last + "\" ></td>";
+                        NewRow += "<td><input id='Account_" + item.Client_Broker_ID + "' style=\"background-color:transparent;\" onchange=\"fn_ChangeSearch('Acct', " + item.Client_Broker_ID + ");\" value=\"" + item.Account + "\" ></td>";
+                        NewRow += "<td><a href='#' id='Headliner_" + item.Client_Broker_ID + "' onclick=\"fn_EditHeadliner2(" + item.Client_Broker_ID + ',' + item.Performer_ID + ");\">" + item.Performer + "</a></td></tr>";
+                        $("#SearchTable tbody").append(NewRow);
+                    });
+                    SearchTable = $('#SearchTable').DataTable({
+                        "destroy": true,
+                        "paging": false,
+                        "searching": true,
+                        "autoWidth": true,
+                        "info": false,
+                        "scrollY": '200px',
+                        "scrollX": false,
+                        "scrollCollapse": true,
+                    });
+
+                   $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Searching Brokers /" + thrownError);
+                }
+            });
+        }
+        function fn_AddBroker()
+        {
+            $("#SearchInput").val('');
+            SearchTable.destroy();
+            $("#SearchTable tbody").empty();
+            $("#AddBrokerDiv").modal('show');
+            SearchTable = $('#SearchTable').DataTable({
+                "destroy": true,
+                "paging": false,
+                "searching": true,
+                "autoWidth": true,
+                "info": false,
+            });
+            setTimeout(function () {
+                $("#SearchInput").focus();
+            }, 250);
+        }
+        function fn_EditCard(ClientBroker_ID, CC_ID) {
+            vClient_Broker_ID = ClientBroker_ID;
+            $("#TR_" + ClientBroker_ID).css('background-color', 'pink');
+            $("#EditCC").val(CC_ID);
+            $("#CCDiv").modal('show');
+        }
+        function fn_UpdateCC() {
+            var r = confirm('Are you sure you want to update Credit Card?');
+            if (r == true) {
+                $('#myPleaseWait').modal('show');
+                var Card_ID = $("#EditCC").val();
+                var URL = "../Season/UpdateCard";
+                $.ajax({
+                    type: 'POST',
+                    data: {
+                        Card_ID: Card_ID,
+                        ClientBroker_ID: vClient_Broker_ID
+                    },
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        STHTable.destroy();
+                        jQuery.each(result, function (index, item) {
+                            $("#Assigned_" + vClient_Broker_ID).attr('title', item.ccNameHover);
+                            $("#Assigned_" + vClient_Broker_ID).text(item.ccName);
+                            $("#TR_" + vClient_Broker_ID).css('background-color', '');
+                        });
+                        STHTable = $('#STHTable').DataTable({
+                            "destroy": true,
+                            "ordering": true,
+                            "scrollY": '70vh',
+                            "scrollX": false,
+                            "scrollCollapse": true,
+                            "paging": false,
+                            "searching": false,
+                            "info": false,
+                            "autoWidth": false,
+                            "aoColumnDefs": [
+                                { targets: [0], sortable: false },
+                                { targets: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21], visible: false },
+                                { iDataSort: 12, targets: [1] },
+                                { iDataSort: 13, targets: [2] },
+                                { iDataSort: 14, targets: [3] },
+                                { iDataSort: 15, targets: [4] },
+                                { iDataSort: 16, targets: [5] },
+                                { iDataSort: 17, targets: [6] },
+                                { iDataSort: 18, targets: [7] },
+                                { iDataSort: 19, targets: [8] },
+                                { iDataSort: 20, targets: [9] },
+                                { iDataSort: 21, targets: [10] },
+                                { "sWidth": "20px", "aTargets": [ 0, 11 ] }
+                            ],
+                            "order": [[1, "asc"]]
+                        });
+                        $('#myPleaseWait').modal('hide');
+                        $("#CCDiv").modal('hide');
+                        STHTable.draw();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Updating Credit Card /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_EditAddress(ClientBroker_ID) {
+            vClient_Broker_ID = ClientBroker_ID;
+            $("#TR_" + ClientBroker_ID).css('background-color', 'pink');
+            $('#myPleaseWait').modal('show');
+            var URL = "../Season/GetClientBrokerAddress?ClientBroker_ID=" + ClientBroker_ID;
+            $.ajax({
+                type: 'GET',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    jQuery.each(result, function (index, item) {
+                        $("#EditAddress1").val(item.Address1);
+                        $("#EditAddress2").val(item.Address2);
+                        $("#EditCity").val(item.City);
+                        $("#EditZip").val(item.Zip);
+                        $("#EditState").val(item.state_id);
+                    });
+                    $('#myPleaseWait').modal('hide');
+                    $("#AddressDiv").modal('show');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Getting ClientBroker Address /" + thrownError);
+                }
+            });
+
+        }
+        function fn_UpdateHeadliner() {
+            var r = confirm('Are you sure you want to change the Headliner?');
+            if (r == true) {
+                $('#myPleaseWait').modal('show');
+                var Performer_ID = $("#EditHeadliner").val();
+                var PerformerName = $("#EditHeadliner option:selected").text();
+                var URL = "../Season/UpdateHeadliner";
+                $.ajax({
+                    type: 'POST',
+                    data: {
+                        Performer_ID: Performer_ID,
+                        ClientBroker_ID: vClient_Broker_ID
+                    },
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        STHTable.destroy();
+                        $("#TR_" + vClient_Broker_ID).remove();
+                        STHTable = $('#STHTable').DataTable({
+                            "destroy": true,
+                            "ordering": true,
+                            "scrollY": '70vh',
+                            "scrollX": false,
+                            "scrollCollapse": true,
+                            "paging": false,
+                            "searching": false,
+                            "info": false,
+                            "autoWidth": false,
+                            "aoColumnDefs": [
+                                { targets: [0], sortable: false },
+                                { targets: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21], visible: false },
+                                { iDataSort: 12, targets: [1] },
+                                { iDataSort: 13, targets: [2] },
+                                { iDataSort: 14, targets: [3] },
+                                { iDataSort: 15, targets: [4] },
+                                { iDataSort: 16, targets: [5] },
+                                { iDataSort: 17, targets: [6] },
+                                { iDataSort: 18, targets: [7] },
+                                { iDataSort: 19, targets: [8] },
+                                { iDataSort: 20, targets: [9] },
+                                { iDataSort: 21, targets: [10] },
+                                { "sWidth": "20px", "aTargets": [ 0, 11 ] }
+                            ],
+                            "order": [[1, "asc"]]
+                        });
+                        $('#myPleaseWait').modal('hide');
+                        $("#HeadlinerDiv").modal('hide');
+                        STHTable.draw();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Updating Headliner /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_UpdateHeadliner2() {
+            var r = confirm('Are you sure you want to change the Headliner?');
+            if (r == true) {
+                $('#myPleaseWait').modal('show');
+                var Performer_ID = $("#EditHeadliner2").val();
+                var PerformerName = $("#EditHeadliner2 option:selected").text();
+ 
+                var URL = "../Season/UpdateHeadliner";
+                $.ajax({
+                    type: 'POST',
+                    data: {
+                        Performer_ID: Performer_ID,
+                        ClientBroker_ID: vClient_Broker_ID
+                    },
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        $('#myPleaseWait').modal('hide');
+                        $('#Headliner2Div').hide();
+                        if (PerformerName.length == 1)
+                            $('#Headliner_' + vClient_Broker_ID).text('None');
+                        else
+                            $('#Headliner_' + vClient_Broker_ID).text(PerformerName);
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        $('#myPleaseWait').modal('hide');
+                        alert("Error: Updating Headliner /" + thrownError);
+                    }
+                });
+                $("TR_" + vClient_Broker_ID).css("background-color", "");
+            }
+        }
+        function fn_EditHeadliner(ClientBroker_ID, Performer_ID)
+        {
+            vClient_Broker_ID = ClientBroker_ID;
+            $("#TR_" + ClientBroker_ID).css('background-color', 'pink');
+            $("#EditHeadliner").val(Performer_ID);
+            $("#HeadlinerDiv").modal('show');
+        }
+        function fn_EditHeadliner2(ClientBroker_ID, Performer_ID, Type) {
+            vClient_Broker_ID = ClientBroker_ID;
+            var Type = $("#Type_" + vClient_Broker_ID).text();
+            if (Type == 'Broker')
+                alert('Brokers cannot contain a default performer.  You must first change the Type to Season.');
+            else
+            {
+                vClient_Broker_ID = ClientBroker_ID;
+                $("#TR_" + ClientBroker_ID).css('background-color', 'pink');
+                $("#EditHeadliner2").val(Performer_ID);
+                $("#Headliner2Div").show();
+            }
+        }
+        function fn_ChangeSearch(Source, Client_Broker_ID) {
+            var NewValue = '';
+            if (Source == 'First')
+                NewValue = $("#First_" + Client_Broker_ID).val();
+            if (Source == 'Last')
+                NewValue = $("#Last_" + Client_Broker_ID).val();
+            if (Source == 'Acct')
+                NewValue = $("#Account_" + Client_Broker_ID).val();
+            var URL = "../Season/UpdateValue";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    ClientBroker_ID: Client_Broker_ID,
+                    Source: Source,
+                    NewValue: NewValue
+                },
+                cache: false,
+                aysnc: true,
+                url: URL,
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Broker /" + thrownError);
+                }
+            });
+        }
+        function fn_Change(Name, NewValue) {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Season/UpdateValue";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    ClientBroker_ID: vClient_Broker_ID,
+                    Source: Name,
+                    NewValue: NewValue
+                },
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    jQuery.each(result, function (index, item) {
+                        var NewStuff = "<a href=\"#\" title=\"" + item.Title + "\">" + item.Address + "</a>";
+                        $("#Address_" + vClient_Broker_ID).html(NewStuff);
+                    });
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Headliner /" + thrownError);
+                    $("#" + Name + "_" + ClientBroker_ID).val(vOldValue);
+                    $("#" + Name + "_" + ClientBroker_ID).select();
+                }
+            });
+        }
+        function fn_PopupPO(PO_ID)
+        {
+            var w = 860;
+            var h = 900;
+            var url = "/Season/POPopup?PO_ID=" + PO_ID;
+            popupWindow(url, "PO", w, h);
+        }
+        function fn_PopupPO2(PO_ID) {
+            var w = 860;
+            var h = 900;
+            var url = "/Season/POPopup2?PO_ID=" + PO_ID;
+            popupWindow(url, "PO", w, h);
+        }
+        function fn_SelectAccount(ClientBroker_ID) {
+            $("#TR_" + ClientBroker_ID).css('background-color', 'pink');
+            $('#myPleaseWait').modal('show');
+            var Parent_ID = $("#ParentList").val();
+            var Headliner_ID = $("#HeadlinerList").val();
+            var Child_ID = $("#ChildList").val();
+            var Grandchild_ID = $("#GrandchildList").val();
+
+            var Title = "";
+            if (Parent_ID > 0)
+                Title += '<b>Parent</b>&nbsp;[<i>' + $("#ParentList :selected").text() + '</i>]&nbsp;&nbsp;';
+            if (Headliner_ID > 0)
+                Title += '<b>Headliner</b>&nbsp;[<i>' + $("#HeadlinerList :selected").text() + '</i>]&nbsp;&nbsp;'
+            if (Child_ID > 0)
+                Title += '<b>Child</b>&nbsp;[<i>' + $("#ChildList :selected").text() + '</i>]&nbsp;&nbsp;';
+            if (Grandchild_ID > 0)
+                Title += '<b>Grandchild</b>&nbsp;[<i>' + $("#GrandchildList :selected").text().replace('(Div I-A and Div I-AA)', '') + '</i>]';
+            
+            var Title2 = '<b>Selected</b>&nbsp;[<i>' + $("#First_" + ClientBroker_ID).val() + ' ' + $("#Last_" + ClientBroker_ID).val() + ' - ' + $("#Account_" + ClientBroker_ID).val() + '</i>]';
+
+            $("#Title1").html(Title);
+            $("#Title2").html(Title2);
+            var Count = 0;
+            var Cost = 0;
+            var Price = 0;
+            var Profit = 0;
+            var URL = "../Season/GetAccountDetails?ClientBroker_ID=" + ClientBroker_ID;
+            $.ajax({
+                type: 'POST',
+                aysnc: false,
+                data: {
+                    Parent: Parent_ID,
+                    Child: Child_ID,
+                    Grandchild: Grandchild_ID,
+                    Headliner: Headliner_ID
+                },
+                url: URL,
+                success: function (result) {
+                    AccountTable.destroy();
+                    $("#AccountTable tbody").empty()
+                    jQuery.each(result, function (index, item) {
+                        Count += 1;
+                        Cost += parseFloat(item.Cost);
+                        Price += parseFloat(item.Price);
+                        Profit += parseFloat(item.Profit);
+                        var NewRow = "<tr id='TR2_" + item.PO_ID + "'><td><a href=\"#\" onclick=\"fn_PopupPO(" + item.PO_ID + ");\">" + item.PO_ID + "</a></td>";
+                        NewRow += "<td><a href=\"#\" title=\"" + item.Event2 + "\" onclick=\"fn_PopupPO2(" + item.PO_ID + ");\">" + item.Event + "</a></td>";
+                        NewRow += "<td style='text-align:right;'>" + item.Qty + "</td>";
+                        NewRow += "<td style='text-align:center;'>" + item.Section + "</td>";
+                        NewRow += "<td style='text-align:center;'>" + item.Row + "</td>";
+                        NewRow += "<td>" + item.CreditCard + "</td>";
+                        NewRow += "<td style='text-align:right;'>" + formatCurrency(item.Cost) + "</td>";
+                        NewRow += "<td style='text-align:right;'>" + formatCurrency(item.Price) + "</td>";
+                        NewRow += "<td style='text-align:right;'>" + formatCurrency(item.Profit) + "</td>";
+                        NewRow += "<td style='text-align:center;'>" + item.Season + "</td>";
+                        NewRow += "<td style='text-align:center;'><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_ClonePO(" + item.PO_ID + "," + item.Season + ");\">input</i></td></tr>";
+                        
+                        $("#AccountTable tbody").append(NewRow);
+                    });
+                    $('#myPleaseWait').modal('hide');
+                    $("#TotalCount").text(Count + ' POs');
+                    $("#TotalCost").text(formatCurrency(Cost));
+                    $("#TotalPrice").text(formatCurrency(Price));
+                    $("#TotalProfit").text(formatCurrency(Profit));
+                    if ($("#AccountDiv").is(':hidden'))
+                        $("#AccountDiv").modal('show');
+                    AccountTable = $('#AccountTable').DataTable({
+                        "destroy": true,
+                        "ordering": true,
+                        "scrollY": '300px',
+                        "scrollX": false,
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": false,
+                        "info": false,
+                        "autoWidth": false,
+                        "aoColumnDefs": [
+                            { targets: [10], sortable: false },
+                            { "sWidth": "20px", "aTargets": [10] }
+                        ],
+                        "order": [[0, "desc"]]
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: GetAccountDetails /" + thrownError);
+                }
+            });
+        }
+        function fn_Select(Name, OldValue) {
+            vOldValue = OldValue;
+            $("#Edit" + Name).select();
+        }
+        function fn_ResetRows() {
+            $(".TRClass").css('background-color', '');
+            $("#EditHeadliner").val(0);
+        }
+        function fn_Reset() {
+            $('#myPleaseWait').modal('show');
+            $.ajax({
+                url: "/Season/ResetFilter",
+                async: false,
+                type: "POST",
+                success: function (response) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Error resetting filter: ' + thrownError);
+                }
+            });
+        }
+        function fn_UpdateValues(Type, NewValue) {
+            $('#myPleaseWait').modal('show');
+            $.ajax({
+                url: "/Season/UpdateValues?Type=" + Type + "&NewValue=" + NewValue,
+                async: false,
+                type: "POST",
+                success: function (response) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Error updating ' + Type + ': ' + thrownError);
+                }
+            });
+        }
+        function fn_ClonePO(PO_ID, Season)
+        {
+            $("#TR2_" + PO_ID).css("background-color", "pink");
+            var url = "/Season/ClonePO?PO_ID=" + PO_ID + "&Season=" + Season;
+            window.open(url, "Clone PO#" + PO_ID);
+        }
+
+        $(document).ready(function () {
+            $(".NavBar").css("background-color", "");
+            $("#SE").css("background-color", "#353535");
+            $("#SearchWrapper8").show();
+            $("#LoginWrapper").show();
+            $("#ParentList").val(@ViewBag.Parent_ID);
+            $("#ChildList").val(@ViewBag.Child_ID);
+            $("#GrandchildList").val(@ViewBag.Grandchild_ID);
+            $("#HeadlinerList").val(@ViewBag.Headliner_ID);
+
+            SearchTable = $('#SearchTable').DataTable({
+                "destroy": true,
+                "paging": false,
+                "searching": true,
+                "autoWidth": true,
+                "info": false,
+            });
+            AccountTable = $('#AccountTable').DataTable({
+                "destroy": true,
+                "paging": false,
+                "searching": true,
+                "autoWidth": true,
+                "info": false,
+            });
+            window.onresize = function () {
+                STHTable.columns.adjust().draw();
+            };
+            $("#STH_Div").show();
+            STHTable = $('#STHTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "scrollY": '70vh',
+                "scrollX": false,
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "autoWidth": false,
+                "aoColumnDefs": [
+                    { targets: [0, 11], sortable: false },
+                    { targets: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21], visible: false },
+                    { iDataSort: 12, targets: [1] },
+                    { iDataSort: 13, targets: [2] },
+                    { iDataSort: 14, targets: [3] },
+                    { iDataSort: 15, targets: [4] },
+                    { iDataSort: 16, targets: [5] },
+                    { iDataSort: 17, targets: [6] },
+                    { iDataSort: 18, targets: [7] },
+                    { iDataSort: 19, targets: [8] },
+                    { iDataSort: 20, targets: [9] },
+                    { iDataSort: 21, targets: [10] },
+                    { "sWidth": "20px", "aTargets": [ 0, 11 ] }
+                ],
+                "order": [[1, "asc"]]
+            });
+            STHTable.draw();
+        });
+    </script>
+}
+<div style="margin-left:160px;margin-top:-87px; position:relative; float:left; padding:10px;">
+    <div style="display:inline-block; float:left;">
+        <label for="ParentList" style="color:#ffffff; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Parent</label>
+        @Html.DropDownList("ParentList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;", @onchange = "fn_UpdateValues('Parent', this.value);" })
+    </div>
+    <div style="display:inline-block; float:left;  margin-left:10px;">
+        <label for="HeadlinerList" style="color:#ffffff; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Headliner</label>
+        @Html.DropDownList("HeadlinerList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;", @onchange = "fn_UpdateValues('Headliner', this.value);" })
+    </div>
+   <div style="display:inline-block; float:left; margin-left:10px;">
+        <label for="ChildList" style="color:#ffffff; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Child</label>
+        @Html.DropDownList("ChildList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;", @onchange = "fn_UpdateValues('Child', this.value);" })
+    </div>
+    <div style="display:inline-block; float:left; margin-left:10px;">
+        <label for="GrandchildList" style="color:#ffffff; width:100%; text-align:center; font-size:12pt; display:block; float:left;">Grandchild</label>
+        @Html.DropDownList("GrandchildList", null, new { @class = "RoundedDropDown", @style = "display:block; clear:both;", @onchange = "fn_UpdateValues('Grandchild', this.value);" })
+    </div>
+    <div style="display:inline-block; float:left; margin-left:10px; margin-top:15px;" onclick="fn_Reset();">
+        <i class="material-icons" style="font-size:32px; color:#adc72e;">restore_page</i>
+    </div>
+</div>
+<div id="MyDashboardWrapper">
+    <div id="STH_Div" style="width:100%; background-color:transparent; margin-top:-30px; float:left; display:block;">
+        <table id="STHTable" class="table-bordered table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="0">
+            <thead>
+                <tr style="height:30px;">
+                    <th style="padding:0; max-width:23px; text-align:center;">
+                        <i class="material-icons" style="color:#adc72e;" onclick="fn_AddBroker();">zoom_in</i>
+                    </th>
+                    <th style="text-align:center;">Headliner</th>
+                    <th style="text-align:center;">First</th>
+                    <th style="text-align:center;">Last</th>
+                    <th style="text-align:center;">Acct</th>
+                    <th style="text-align:center;">Email</th>
+                    <th style="text-align:center;">Pass</th>
+                    <th style="text-align:center;">PIN</th>
+                    <th style="text-align:center;">cc</th>
+                    <th style="text-align:center;">Address</th>
+                    <th style="text-align:center;">Profit</th>
+                    <th></th>
+                    <th>HeadlinerSort</th>
+                    <th>FirstSort</th>
+                    <th>LastSort</th>
+                    <th>AcctSort</th>
+                    <th>EmailSort</th>
+                    <th>PassSort</th>
+                    <th>PINSort</th>
+                    <th>ccSort</th>
+                    <th>AddressSort</th>
+                    <th>ProfitSort</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr class="TRClass" id="TR_@item.Client_Broker_ID">
+                        <td style="padding:0; max-width:23px; text-align:center;">
+                            <i class="material-icons" style="color:#adc72e;" onclick="fn_SelectAccount(@item.Client_Broker_ID);">input</i>
+                        </td>
+                        <td style="padding:0; max-width:100px; overflow: hidden; white-space:nowrap; padding-left:5px;" id="Performer_@item.Client_Broker_ID" onclick="fn_EditHeadliner(@item.Client_Broker_ID, @item.Performer_ID);"><a href="#" title="@item.DefaultPerformer">@item.DefaultPerformer</a></td>
+                        <td style="padding:0; max-width:55px;"><input id="First_@item.Client_Broker_ID" style="padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.First" onclick="vClient_Broker_ID = @item.Client_Broker_ID;" onchange="fn_Change('First', this.value);" /></td>
+                        <td style="padding:0; max-width:55px;"><input id="Last_@item.Client_Broker_ID" style="padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.Last" onclick="vClient_Broker_ID = @item.Client_Broker_ID;" onchange="fn_Change('Last', this.value);" /></td>
+                        <td style="padding:0; max-width:55px;"><input id="Account_@item.Client_Broker_ID" style="padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.Account" onclick="vClient_Broker_ID = @item.Client_Broker_ID;" onchange="fn_Change('Acct', this.value);" /></td>
+                        <td style="padding:0; max-width:100px;"><input id="Email_@item.Client_Broker_ID" style="padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.Email" onclick="vClient_Broker_ID = @item.Client_Broker_ID;" onchange="fn_Change('Email', this.value);" /></td>
+                        <td style="padding:0; max-width:40px;"><input id="Password_@item.Client_Broker_ID" style="padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.Password" onclick="vClient_Broker_ID = @item.Client_Broker_ID;" onchange="fn_Change('Password', this.value);" /></td>
+                        <td style="padding:0; max-width:40px;"><input id="PIN_@item.Client_Broker_ID" style="padding-left:5px; width:100%; height:100%; border:none; background-color:transparent;" value="@item.PIN" onclick="vClient_Broker_ID = @item.Client_Broker_ID;" onchange="fn_Change('PIN', this.value);" /></td>
+                        <td style="padding:0; max-width:40px;" onclick="fn_EditCard(@item.Client_Broker_ID, @item.CC_ID);"><a href="#" id="Assigned_@item.Client_Broker_ID" style="padding-left:5px;" title="@item.ccNameHover">@item.ccName</a></td>
+                        <td style="padding:0; max-width:100px; overflow: hidden; white-space:nowrap; padding-left:5px;" id="Address_@item.Client_Broker_ID" onclick="fn_EditAddress(@item.Client_Broker_ID);"><a href="#" title="@item.Address1
+@item.Address2
+@item.City @item.State  @item.Zip">@item.Address1 @item.Address2 @item.City @item.State @item.Zip</a></td>
+                        <td style="padding:0; padding-right:5px; width:40px; max-width:40px; text-align:right;">@string.Format("{0:C}", item.Profit)</td>
+                        <td style="padding:0; max-width:23px; text-align:center;">
+                            <i class="material-icons" style="color:#adc72e;" onclick="fn_Delete(@item.Client_Broker_ID);">delete_forever</i>
+                        </td>
+                        <td>@item.DefaultPerformer</td>
+                        <td>@item.First</td>
+                        <td>@item.Last</td>
+                        <td>@item.Account</td>
+                        <td>@item.Email</td>
+                        <td>@item.Password</td>
+                        <td>@item.PIN</td>
+                        <td>@item.ccName</td>
+                        <td>@item.Address1 @item.Address2 @item.City @item.State @item.Zip</td>
+                        <td>@item.Profit</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="11">@ViewBag.RecordCount</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+<!--Begin Modal-->
+<div class="modal loadingModal" id="CCDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog" style="border-radius:4px;">
+        <div class="modal-content modal-sm" style="border-radius:6px; background-color:#ecf2f9;"">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="margin-left:10px; width:80%; float:left;">
+                    <label style="font-size:20pt; margin-top:5px; font-weight:500; color:#ffffff; max-width:80%; float:left;">Change CreditCard</label>
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_ResetRows();">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                @Html.DropDownList("CCList", null, new { @id = "EditCC", @class = "RoundedDropDown", @style = "margin-left:-11px; display:block; clear:both; float:left;", @onchange = "fn_UpdateCC();" })
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="HeadlinerDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog" style="border-radius:4px;">
+        <div class="modal-content modal-sm" style="border-radius:6px; background-color:#ecf2f9;" >
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="margin-left:10px; width:80%; float:left;">
+                    <label style="font-size:20pt; margin-top:5px; font-weight:500; color:#ffffff; max-width:80%; float:left;">Change Headliner</label>
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_ResetRows();">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                @Html.DropDownList("HeadlinerList2", null, new { @id = "EditHeadliner", @class = "RoundedDropDown", @style = "margin-left:-11px; display:block; clear:both; float:left;", @onchange = "fn_UpdateHeadliner();" })
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="AddressDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog" style="border-radius:4px;">
+        <div class="modal-content modal-sm" style="border-radius:6px; background-color:#ecf2f9;"">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="margin-left:10px; width:80%; float:left;">
+                    <label style="font-size:20pt; margin-top:5px; font-weight:500; color:#ffffff; max-width:80%; float:left;">Change Address</label>
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_ResetRows();">Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div style="clear:both; display:block; margin:5px; width:100%; align-content:center;">
+                    <label for="EditAddress1" style="width:55px; text-align:right;">Address1:</label>
+                    <input id="EditAddress1" style="padding-left:5px; width:190px; background-color:#ffffff;" value="" onchange="fn_Change('Address1', this.value);" />
+                </div>
+                <div style="clear:both; display:block; margin:5px; width:100%; align-content:center;">
+                    <label for="EditAddress2" style="width:55px; text-align:right;">Address2:</label>
+                    <input id="EditAddress2" style="border-radius:4px; padding-left:5px; width:190px; background-color:#ffffff;" value="" onchange="fn_Change('Address2', this.value);" />
+                </div>
+                <div style="clear:both; display:block; margin:5px; width:100%; align-content:center;">
+                    <label for="EditCity" style="width:55px; text-align:right;">City:</label>
+                    <input id="EditCity" style="padding-left:5px; width:190px;background-color:#ffffff;" value="" onchange="fn_Change('City', this.value);" />
+                </div>
+                <div style="clear:both; display:block; margin:5px; width:100%; align-content:center;">
+                    <label for="StateList" style="width:55px; text-align:right;">State:</label>
+                    <div style="display:inline-block;">@Html.DropDownList("StateList", null, new { @id = "EditState", @class = "RoundedDropDown", @onchange = "fn_Change('State', this.value);" })</div>
+                </div>
+                <div style="clear:both; display:block; margin:5px; width:100%; align-content:center;">
+                    <label for="EditZip" style="width:55px; text-align:right;">Zip:</label>
+                    <input id="EditZip" style="padding-left:5px; width:100px; background-color:#ffffff;" value="" onchange="fn_Change('Zip', this.value);" />
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="AccountDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#ecf2f9;"">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="padding:10px; float:left;">
+                    <label id="Title1" style="font-size:14pt; color:#ffffff; float:left;"></label>
+                    <label id="Title2" style="clear:both; font-size:14pt; color:#ffffff; float:left;"></label>
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" >Close</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="CSSTableGenerator">
+                    <table id="AccountTable" class="table-bordered table-condensed" style="margin:auto; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                        <thead>
+                            <tr style="height:30px;">
+                                <th>PO_ID</th>
+                                <th>Event</th>
+                                <th>Qty</th>
+                                <th>Section</th>
+                                <th>Row</th>
+                                <th>cc#</th>
+                                <th>Cost</th>
+                                <th>Price</th>
+                                <th>Profit</th>
+                                <th>Season</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="6" id="TotalCount"></th>
+                                <th id="TotalCost" style='text-align:right;'></th>
+                                <th id="TotalPrice" style='text-align:right;'></th>
+                                <th id="TotalProfit" style='text-align:right;'></th>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="AddBrokerDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px; ">
+        <div class="modal-content" style="border-radius:6px; background-color:#ecf2f9;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="padding:10px; float:left;">
+                    <label style="margin:10px; font-size:18pt; color:#ffffff; float:left;">Search For Broker</label>
+                </div>
+                <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:right;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_ResetRows();">Close</button>
+                </div>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <input id="SearchInput" />
+                <button type="button" class="btn btn-default" style="background-color:#aec72d; color:#ffffff;" onclick="fn_BrokerSearch();">Search</button>
+                <div class="CSSTableGenerator" style="text-align:center; margin-top:10px;">
+                    <table id="SearchTable" class="table-bordered table-condensed" style="margin:auto; border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);" border="1">
+                        <thead>
+                            <tr style="height:30px;">
+                                <th>Type</th>
+                                <th>First</th>
+                                <th>Last</th>
+                                <th>Account</th>
+                                <th>Performer</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div id="Headliner2Div" style="position:absolute; margin:10px; border:solid black 1px; border-radius:6px; background-color:#ecf2f9; padding:0px; display:none; float:left;">
+                    <div>
+                        <div style="margin:10px; width:95%; border-radius:6px; background-color:#1c81db; padding:0px; float:left;">
+                            <label style="margin:10px; font-size:18pt; font-weight:500; color:#ffffff; max-width:80%; float:left;">Change Headliner</label>
+                            <button type="button" class="btn btn-default" style="margin:5px; float:right; background-color:#aec72d; color:#ffffff;" onclick="fn_HideChangePerformer();" >Close</button>
+                       </div>
+                    </div>
+                    <div>
+                        @Html.DropDownList("HeadlinerList2", null, new { @id = "EditHeadliner2", @class = "RoundedDropDown", @style = "margin:10px; display:block; clear:both; float:left;", @onchange = "fn_UpdateHeadliner2();" })
+                    </div>
+                </div id="Headliner2Div">
+
+            </div>
+        </div>
+    </div>
+</div>
+

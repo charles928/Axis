@@ -1,0 +1,997 @@
+﻿@model IEnumerable<spGet_STHList_Result>
+
+@{
+    ViewBag.Title = "STH Create PO";
+}
+@section scripts {
+<script type="text/javascript">
+    var VendorTable;
+    var vSearch = "";
+    var SRTable;
+    var StockType = '';
+    var ShippingMethod = '';
+    var Vendor_ID = 0;
+    var Buyer_ID = 1;
+    $.ajax({
+        type: 'GET',
+        url: "GetStockType",
+        success: function (result) {
+            jQuery.each(result, function (index, value) {
+                StockType += "<option id=" + value.ID + ">" + value.Desc + "</option>";
+            });
+        },
+        error: function (xhr, ajaxOptions, thrownError) {
+            alert("Error: Getting Stock Type /" + thrownError);
+        }
+    });
+    $.ajax({
+        type: 'GET',
+        url: "GetShippingMethod",
+        success: function (result) {
+            jQuery.each(result, function (index, value) {
+                ShippingMethod += "<option id=" + value.ID + ">" + value.Desc + "</option>";
+            });
+        },
+        error: function (xhr, ajaxOptions, thrownError) {
+            alert("Error: Getting Shipping Method /" + thrownError);
+        }
+    });
+
+    function fn_CompletePurchase() {
+        var Retval = false;
+        if (Vendor_ID == 0) //Blank or new Vendor
+        {
+            if ($("#VCompany").val().length == 0 && ($("#VFirst").val() == 0 || $("#VLast").val() == 0))
+            {
+                $("#VCompany").focus();
+                alert('You must enter a Company or First and Last Names.');
+            } else {
+                if ($("#VAddress1").val().length == 0)
+                {
+                    $("#VAddress1").focus();
+                    alert('You must enter an address.');
+                } else {
+                    if ($("#VCity").val().length == 0)
+                    {
+                        $("#VCity").focus();
+                        alert('You must enter a city.');
+                    } else {
+                        if ($("#VCountry").val() == 0)
+                        {
+                            $("#VCountry").focus();
+                            alert('You must select a Country.');
+                        } else {
+                            if ($("#VState").val() == 0 &&($("#VCountry").val() == 38 || $("#VCountry").val() == 217))
+                            {
+                                $("#VState").focus();
+                                alert('You must select a State.');
+                            } else {
+                                if ($("#VEmail").val().length == 0 && $("#VPhone").val().length == 0)
+                                {
+                                    $("#VEmail").focus();
+                                    alert('You must enter either an Email or a Phone.');
+                                } else {
+                                    Retval = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Retval = true;
+        }
+        if (Retval) { // Good Vendor Input
+            if (Vendor_ID == 0) { // Create Vendor
+                var URL = "AddVendor";
+                $.ajax({
+                    async: false,
+                    type: 'POST',
+                    url: URL,
+                    data: {
+                        STHFlag: $("#STHOnly").is(":checked"),
+                        Company: $("#VCompany").val(),
+                        First: $("#VFirst").val(),
+                        Last: $("#VLast").val(),
+                        Address1: $("#VAddress1").val(),
+                        Address2: $("#VAddress2").val(),
+                        City: $("#VCity").val(),
+                        State_ID: $("#VState").val(),
+                        ZipCode: $("#VZip").val(),
+                        Country_ID: $("#VCountry").val(),
+                        Email: $("#VEmail").val(),
+                        Phone: $("#VPhone").val()
+                    },
+                    success: function (result) {
+                        Vendor_ID = result;
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert("Error: Adding Vendor /" + thrownError);
+                    }
+                });
+            }
+        }
+        if (Vendor_ID > 0)
+        {
+            var Items = "";
+            $("#CartTable TBODY TR").each(function () {
+                var TR_ID = this.id.split('_');
+                var Exchange_ID = $("#ExchangeID_" + TR_ID[1]).val();
+                var SSF = $("#SSF_" + TR_ID[1]).text();
+                var Qty = $("#Qty_" + TR_ID[1]).val();
+                var Sec = $("#Sec_" + TR_ID[1]).val();
+                var Row = $("#Row_" + TR_ID[1]).val();
+                var Min = $("#Min_" + TR_ID[1]).val();
+                var Donation = $("#Don_" + TR_ID[1]).val().replace("$", "").replace(",", "");
+                var Cost = $("#Cost_" + TR_ID[1]).val().replace("$", "").replace(",", "");
+                var Price = $("#Price_" + TR_ID[1]).val().replace("$", "").replace(",", "");
+                var Stock = $("#ST_" + TR_ID[1]).find('option:selected').attr('id');
+                var Shipping = $("#SM_" + TR_ID[1]).find('option:selected').attr('id');
+                var Notes = $("#Notes_" + TR_ID[1]).val();
+                var Inhand = $("#IH_" + TR_ID[1]).is(":checked");
+                Items += "~" + Exchange_ID + '|' + SSF + '|' + Qty + '|' + Sec + '|' + Row + '|' + Min + '|' + Donation + '|' + Cost + '|' + Price + '|' + Stock + '|' + Shipping + '|' + Notes + '|' + Inhand;
+            });
+
+            var Payments = "";
+            $("#PayTable TBODY TR").each(function () {
+                var TR_ID = this.id.split('_');
+                var PayType_ID = $("#PayTypeID_" + TR_ID[1]).val();
+                var CC_ID = $("#CCID_" + TR_ID[1]).val();
+                var PayNote = $("#PayNote_" + TR_ID[1]).val();
+                var Amt = $("#PayAmt_" + TR_ID[1]).text().replace("$", "").replace(",", "");
+                Payments += "~" + PayType_ID + '|' + CC_ID + '|' + PayNote + '|' + Amt;
+            });
+
+            var URL = "AddPO";
+            $.ajax({
+                async: false,
+                type: 'POST',
+                url: URL,
+                data: {
+                    VendorID: Vendor_ID,
+                    PONotes: $("#InvoiceNotes").val(),
+                    Items: Items,
+                    Payments: Payments
+                },
+                success: function (result) {
+                    PO_ID = result;
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Adding PO /" + thrownError);
+                }
+            });
+        }
+    }
+    function fn_TotalPO() {
+        var TotalDonation = 0;
+        var TotalCost = 0;
+        $("#CartTable TBODY TR").each(function () {
+            var TR_ID = this.id.split('_');
+            TotalDonation += parseFloat($("#Don_" + TR_ID[1]).val().replace("$", "").replace(",", ""));
+            TotalCost += parseFloat($("#Cost_" + TR_ID[1]).val().replace("$", "").replace(",", ""));
+        });
+        var TotalPaid = 0;
+        $("#PayTable TBODY TR").each(function () {
+            var TR_ID = this.id.split('_');
+            TotalPaid += parseFloat($("#PayAmt_" + TR_ID[1]).text().replace("$", "").replace(",", ""));
+        });
+        $("#DonTotal").val(formatCurrency(TotalDonation));
+        $("#CostTotal").val(formatCurrency(TotalCost));
+        $("#CartTotal").val(formatCurrency(parseFloat(TotalDonation) + parseFloat(TotalCost)));
+        $("#CartPayTotal").val(formatCurrency(TotalPaid));
+        $("#CartBalance").val(formatCurrency(parseFloat(TotalDonation) + parseFloat(TotalCost) - parseFloat(TotalPaid)));
+        $("#PayAmt").val(formatCurrency(parseFloat(TotalDonation) + parseFloat(TotalCost) - parseFloat(TotalPaid)));
+        if ((parseFloat(TotalDonation) + parseFloat(TotalCost)) > 0 && (parseFloat(TotalDonation) + parseFloat(TotalCost) - parseFloat(TotalPaid) == 0))
+            $("#CreateDiv").show();
+        else
+            $("#CreateDiv").hide();
+    }
+    function fn_DeletePayment() {
+        var td = event.target.parentNode;
+        var tr = td.parentNode; // the row to be removed
+        tr.parentNode.removeChild(tr);
+        fn_TotalPO();
+    }
+    function fn_PickCC() {
+        var CC_ID = $("#CCList :selected").val();
+        if (CC_ID > 0)
+        {
+            var CC_Type = $("#CCList :selected").text();
+            var PayAmt = $("#PayAmt").val().replace("$", "").replace(",", "");
+            var PayTypeID = $("#PayTypeList :selected").val();
+            var PayType = $("#PayTypeList :selected").text();
+            var NewID = 0;
+            $('#PayTable TBODY TR').each(function () {
+                var ID = this.id.replace("PayTR_", "");
+                if (parseInt(ID) > parseInt(NewID))
+                    NewID = ID;
+            });
+            NewID = parseInt(NewID) + 1;
+            var NewRec = "<tr id=\"PayTR_" + NewID + "\"><td style=\"padding:0;\">" + "<input type=\"hidden\" id=\"PayTypeID_" + NewID + "\" value=" + PayTypeID + " />" + "<input type=\"hidden\" id=\"CCID_" + NewID + "\" value=" + CC_ID + " />" + PayType + "</td>" +
+                "<td><input id=\"PayNote_" + NewID + "\" style=\"width:100%\" value=\"" + CC_Type + "\" readonly=\"readonly\" /></td>" +
+                "<td id=\"PayAmt_" + NewID + "\" style=\"padding:0; text-align:right; width:40px;\">" + formatCurrency(PayAmt) + "</td>" +
+                "<td style=\"padding:0; text-aligh:center; max-width:23px;\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_DeletePayment();\">clear</i></tr>";
+
+            $("#PayTable > tbody").append(NewRec);
+            $("#CreditCardDiv").modal('hide');
+
+            fn_TotalPO();
+        }
+    }
+    function fn_AddPayment() {
+        var PayAmt = $("#PayAmt").val().replace("$", "").replace(",", "");
+        var BalanceAmt = $("#CartBalance").val().replace("$", "").replace(",", "");
+        var PayTypeID = $("#PayTypeList :selected").val();
+        var PayType = $("#PayTypeList :selected").text();
+        var PaidAmt = $("#CartPayTotal").val().replace("$", "").replace(",", "");
+
+        if (parseFloat(PayAmt) <= 0)
+        {
+            alert("Amount must be greater than $0.00");
+            $("#PayAmt").focus();
+            $("#PayAmt").select();
+        } else {
+            if (parseFloat(PayAmt) > parseFloat(BalanceAmt)) {
+                alert("Amount cannot exceede the balance of " + formatCurrency(BalanceAmt));
+                $("#PayAmt").focus();
+                $("#PayAmt").select();
+            } else {
+                if (PayTypeID == 1) {
+                    $("#CCList").val(0);
+                    $("#CreditCardDiv").modal('show');
+                } else {
+                    var NewID = 0;
+                    $('#PayTable TBODY TR').each(function () {
+                        var ID = this.id.replace("PayTR_", "");
+                        if (parseInt(ID) > parseInt(NewID))
+                            NewID = ID;
+                    });
+                    NewID = parseInt(NewID) + 1;
+
+                    var NewRec = "<tr id=\"PayTR_" + NewID + "\"><td style=\"padding:0;\">" +
+                               "<input type=\"hidden\" id=\"PayTypeID_" + NewID + "\" value=" + PayTypeID + " />" +
+                               "<input type=\"hidden\" id=\"CCID_" + NewID + "\" value=0 />" + PayType + "</td>" +
+                               "<td style=\"padding:0; text-align:center;\"><input id=\"PayNote_" + NewID + "\" style=\"width:100%\" onclick=\"this.select();\" /></td>" +
+                               "<td id=\"PayAmt_" + NewID + "\" style=\"padding:0; text-align:right; width:40px;\">" + formatCurrency(PayAmt) + "</td>" +
+                               "<td style=\"padding:0; text-aligh:center; max-width:23px;\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_DeletePayment();\">clear</i></tr>";
+
+                    $("#PayTable > tbody").append(NewRec);
+                    fn_TotalPO();
+                    $("#PayTypeList").val(1);
+                    setTimeout(function () {
+                        $("#PayNote_" + NewID).focus();
+                    }, 250);
+                }
+            }
+        }
+    }
+    function fn_UpdatePayAmt() {
+        NewAmt = $("#PayAmt").val().replace("$", "").replace(",", "");
+        $("#PayAmt").val(formatCurrency(NewAmt));
+    }
+    function fn_VendorClear() {
+        $('#STHOnly').prop('checked', true);
+        $('#VState').val(0);
+        $('#VCountry').val(0);
+        $('#VCompany').val('');
+        $('#VFirst').val('');
+        $('#VLast').val('');
+        $('#VAddress1').val('');
+        $('#VAddress2').val('');
+        $('#VCity').val('');
+        $('#VZip').val('');
+        $('#VEmail').val('');
+        $('#VPhone').val('');
+    }
+    function fn_SelectVendor(Client_ID, State_ID, Country_ID) {
+        Vendor_ID = Client_ID;
+        var vCompany = $('#Company_' + Client_ID).text();
+        var vFirst = $('#First_' + Client_ID).text();
+        var vLast = $('#Last_' + Client_ID).text();
+        var vAddress1 = $('#Address1_' + Client_ID).text();
+        var vAddress2 = $('#Address2_' + Client_ID).text();
+        var vCity = $('#City_' + Client_ID).text()
+        var vZip = $('#Zip_' + Client_ID).text()
+        var vEmail = $('#Email_' + Client_ID).text()
+        var vPhone = $('#Phone_' + Client_ID).text()
+
+        $("#VCompany").val(vCompany);
+        $("#VFirst").val(vFirst);
+        $("#VLast").val(vLast);
+        $("#VAddress1").val(vAddress1);
+        $("#VAddress2").val(vAddress2);
+        $("#VCity").val(vCity);
+        $("#VZip").val(vZip);
+        $("#VEmail").val(vEmail);
+        $("#VPhone").val(vPhone);
+        $("#VState").val(State_ID);
+        $("#VCountry").val(Country_ID);
+        $("#VendorSearchDiv").modal("hide");
+    }
+    function fn_VendorSearch() {
+        $('#myPleaseWait').modal('show');
+        var STHOnly = $("#STHOnly").is(":checked");
+        var Company = $("#VCompany").val();
+        var First = $("#VFirst").val();
+        var Last = $("#VLast").val();
+        var Address1 = $("#VAddress1").val();
+        var Address2 = $("#VAddress2").val();
+        var City = $("#VCity").val();
+        var Zip = $("#VZip").val();
+        var Email = $("#VEmail").val();
+        var Phone = $("#VPhone").val();
+
+        if (Company.length > 0 || First.length > 0 || Last.length > 0 || Address1.length > 0 || Address2.length || City.length > 0 || Zip.length > 0 || Email.length > 0 || Phone.length > 0) {
+            var URL = "VendorSearch";
+            $.ajax({
+                type: 'POST',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                data: {
+                    STHOnly: STHOnly,
+                    Company: Company,
+                    First: First,
+                    Last: Last,
+                    Address1: Address1,
+                    Address2: Address2,
+                    City: City,
+                    Zip: Zip,
+                    Email: Email,
+                    Phone: Phone
+                },
+                success: function (result) {
+                    VendorTable.destroy();
+                    $("#VendorTable > TBODY").empty();
+                    jQuery.each(result, function (index, item) {
+                        var NewRec = "<tr onclick=\"fn_SelectVendor(" + item.C_ID + ", " + item.State_ID + ", " + item.Country_ID + ");\">";
+                        NewRec += "<td style=\"text-align:center\">" + item.Type + "</td>";
+                        NewRec += "<td id=\"Company_" + item.C_ID + "\">" + item.Company + "</td>";
+                        NewRec += "<td id=\"First_" + item.C_ID + "\">" + item.First + "</td>";
+                        NewRec += "<td id=\"Last_" + item.C_ID + "\">" + item.Last + "</td>";
+                        NewRec += "<td id=\"Address1_" + item.C_ID + "\">" + item.Address1 + "</td>";
+                        NewRec += "<td id=\"Address2_" + item.C_ID + "\">" + item.Address2 + "</td>";
+                        NewRec += "<td id=\"City_" + item.C_ID + "\">" + item.City + "</td>";
+                        NewRec += "<td>" + item.State + "</td>";
+                        NewRec += "<td id=\"Zip_" + item.C_ID + "\">" + item.Zip + "</td>";
+                        NewRec += "<td>" + item.Country + "</td>";
+                        NewRec += "<td id=\"Email_" + item.C_ID + "\">" + item.Email + "</td>";
+                        NewRec += "<td id=\"Phone_" + item.C_ID + "\">" + item.Phone + "</td>";
+                        $("#VendorTable > tbody").append(NewRec);
+                    });
+                    $("#VendorSearchDiv").modal("show");
+                    VendorTable = $('#VendorTable').DataTable({
+                        "destroy": true,
+                        "ordering": true,
+                        "scrollY": '40vh',
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "autowidth": false,
+                    });
+
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Searching Vendors /" + thrownError);
+                }
+            });
+        } else {
+            alert('You must enter some value to search for.  (Company or Name or Address or City or Zip or Phone or Email')
+        }
+    }
+    function fn_AddAdvancedSearch() {
+        $("#SearchResult2Table TBODY TR").filter(':has(:checkbox:checked)').each(function () {
+            var Exchange_ID = this.id.split('_');
+            fn_SelectEvent(Exchange_ID[1]);
+        });
+    }
+    function fn_ChangePrice(NameID) {
+        var NewVal = $("#" + NameID).val().replace(',', '').replace('$', '');
+        $("#" + NameID).val(formatCurrency(NewVal));
+        fn_TotalPO()
+    }
+    function fn_ClickSSF(ID) {
+        var Current = $("#SSF_" + ID).text();
+        if (Current == 'Seq') {
+            $("#SSF_" + ID).text('Not');
+        } else {
+            $("#SSF_" + ID).text('Seq');
+        }
+        fn_ChangeSeats("SSF_" + ID);
+    }
+    function fn_ChangeSeats(NameID) {
+        var ID = NameID.split("_");
+        var Current = $("#SSF_" + ID[1]).text();
+        var Qty = $("#Qty_" + ID[1]).val();
+        var Min = $("#Min_" + ID[1]).val();
+        var Max;
+        if (Current == 'Seq') {
+            if (parseInt(Qty) > 0)
+                Max = parseInt(Min) + parseInt(Qty) - 1;
+        } else {
+            if (parseInt(Qty) > 0)
+                Max = parseInt(Min) + (parseInt(Qty) * 2) - 2;
+        }
+        $("#Max_" + ID[1]).text(Max);
+        if (ID[0] == "SSF") {
+            $("#Qty_" + ID[1]).focus();
+            $("#Qty_" + ID[1]).select();
+        }
+        if (ID[0] == "Qty") {
+            $("#Sec_" + ID[1]).focus();
+            $("#Sec_" + ID[1]).select();
+        }
+        if (ID[0] == "Min") {
+            $("#Don_" + ID[1]).focus();
+            $("#Don_" + ID[1]).select();
+        }
+    }
+    function fn_DelRow(ID) {
+        $("#TR_" + ID).remove();
+        fn_TotalPO();
+    }
+    function fn_AddRow(Exchange_ID) {
+        fn_SelectEvent(Exchange_ID);
+    }
+    function fn_SelectEvent(Exchange_ID) {
+        var URL = "STHEventInfo?Exchange_ID=" + Exchange_ID;
+        $('#myPleaseWait').modal('show');
+        $.ajax({
+            type: 'GET',
+            cache: false,
+            aysnc: false,
+            url: URL,
+            success: function (result) {
+                $("#SearchResult").hide();
+                var NewID = 0;
+                $('#CartTable TBODY TR').each(function () {
+                    var ID = this.id.replace("TR_", "");
+                    if (parseInt(ID) > parseInt(NewID))
+                        NewID = ID;
+                });
+                NewID = parseInt(NewID) + 1;
+
+                jQuery.each(result, function (index, value) {
+                    var NewRec = "<tr id=\"TR_" + NewID + "\" class=\"TRClass\">" +
+                        "<td style=\"padding:0; max-width:23px; text-align:center;\" title=\"Create a new copy of this line item.\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_AddRow(" + Exchange_ID + ");\">add</i></td>" +
+                        "<td style=\"padding:0; text-align:left; background-color:RGBA(211,211,211,.4);\"><input type=\"hidden\" id=\"ExchangeID_" + NewID + "\" value=" + Exchange_ID + " />" + value.Event + "</td>" +
+                        "<td style=\"padding:0; text-align:left; background-color:RGBA(211,211,211,.4);\">" + value.EventDate + "</td>" +
+                        "<td style=\"padding:0; text-align:left;\ background-color:RGBA(211,211,211,.4);\">" + value.Venue + "</td>" +
+                        "<td style=\"padding:0;\"><a href='#' id=\"SSF_" + NewID + "\" style=\"padding-left:5px; padding-right:5px;\" onclick=\"fn_ClickSSF(" + NewID + ");\" >Seq</a></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Qty_" + NewID + "\" style=\"max-width:40px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangeSeats(this.id);\" value=0 /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Sec_" + NewID + "\" style=\"max-width:80px;\" onclick=\"this.select();\" /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Row_" + NewID + "\" style=\"max-width:60px;\" onclick=\"this.select();\" /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Min_" + NewID + "\" style=\"max-width:40px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangeSeats(this.id);\" value=0 /></td>" +
+                        "<td style=\"padding:0; text-align:right; width:40px; background-color:RGBA(211,211,211,.4); \" id=\"Max_" + NewID + "\" >0</td>" +
+                        "<td style=\"padding:0;\"><input id=\"Don_" + NewID + "\" style=\"max-width:80px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangePrice(this.id);\" value='$0.00' /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Cost_" + NewID + "\" style=\"max-width:80px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangePrice(this.id);\" value='$0.00' /></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Price_" + NewID + "\" style=\"max-width:80px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangePrice(this.id);\" value='$0.00' /></td>" +
+                        "<td><select id=\"ST_" + NewID + "\" style=\"max-width:70px;\" >" + StockType + "</select></td>" +
+                        "<td><select id=\"SM_" + NewID + "\" style=\"max-width:70px;\" >" + ShippingMethod + "</select></td>" +
+                        "<td style=\"padding:0;\"><input id=\"Notes_" + NewID + "\" onclick=\"this.select();\" /></td>" +
+                        "<td style=\"padding:0; text-align:center;\"><input type=\"checkbox\" id=\"IH_" + NewID + "\" /></td>" +
+                        "<td style=\"padding:0; max-width:23px; text-align:center;\" title=\"Remove this line item.\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_DelRow(" + NewID + ");\">clear</i></td></tr>"
+
+                    $("#CartTable > tbody").append(NewRec);
+                });
+
+                fn_ClearSearch();
+                $("#myPleaseWait").modal('hide');
+                $("#Qty_" + NewID).focus();
+                $("#Qty_" + NewID).select();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                $('#myPleaseWait').modal('hide');
+                alert("Error: Getting Event Info /" + thrownError);
+            }
+        });
+    }
+    function fn_Continue() {
+        var SD = $("#StartDateAdv").val();
+        var ED = $("#EndDateAdv").val();
+        var vParentID = $("#ParentList").val();
+        var vChildID = $("#ChildList").val();
+        var vGrandchildID = $("#GrandchildList").val();
+        var Search = $("#AdvSearchBox").val();
+        var Title = '(' + Search + ') From:' + SD + ' To:' + ED;
+
+        if ($("#ParentList option:selected").text().length > 0)
+            Title += ' ' + $("#ParentList option:selected").text();
+
+        if ($("#ChildList option:selected").text().length > 0)
+            Title += ' ' + $("#ChildList option:selected").text();
+
+        if ($("#GrandchildList option:selected").text().length > 0)
+            Title += ' ' + $("#GrandchildList option:selected").text();
+
+        $("#Title2").text(Title);
+
+        $('#AdvancedSearchDiv').modal('hide');
+
+        $('#myPleaseWait').modal('show');
+        setTimeout(function () {
+            var URL = "ExchangeSearch";
+            $.ajax({
+                type: "POST",
+                data: {
+                    Start: SD,
+                    End: ED,
+                    Input: Search,
+                    ParentID: vParentID,
+                    ChildID: vChildID,
+                    GrandchildID: vGrandchildID
+                },
+                cache: false,
+                aysnc: true,
+                url: URL,
+                success: function (result) {
+                    $("#ClearSearch").show();
+                    //var foot = result.length + "&nbsp;events&nbsp;found.";
+                    var SearchResult2Table = $("#SearchResult2Table").DataTable().destroy();
+                    $("#SearchResult2Table tbody").empty();
+                    $.each(result, function (key, value) {
+
+                        var NewRec = "<tr class=\"TRClass\" id=\"TR_" + value.Event_ID + "\">" +
+                            "<td style=\"padding:0; max-width:23px; text-align:center;\"><input class=\"AdvEvent\" id=\"Check_" + value.Event_ID + "\" type='checkbox' /></td>" +
+                            "<td style=\"padding:0; text-align:left;\">" + value.EventDate + "</td>" +
+                            "<td style=\"padding:0; text-align:left;\">" + value.Status + "</td>" +
+                            "<td style=\"padding:0; text-align:left;\">" + value.Event + "</td>" +
+                            "<td style=\"padding:0; text-align:left;\">" + value.Venue + "</td>" +
+                            "<td style=\"padding:0; text-align:left;\">" + value.SortDate + "</td></tr>"
+
+                        $("#SearchResult2Table > tbody").append(NewRec);
+                    })
+                    $("#SearchResult2Div").modal('show');
+                    SRTable = $('#SearchResult2Table').DataTable({
+                        "destroy": true,
+                        "ordering": true,
+                        "scrollY": '300px',
+                        "scrollX": false,
+                        "scrollCollapse": true,
+                        "paging": false,
+                        "searching": true,
+                        "info": false,
+                        "aoColumnDefs": [
+                            { targets: [5], visible: false },
+                            { iDataSort: 5, targets: [1] },
+                            { "sWidth": "20px", "aTargets": [0] },
+                            { targets: [0], sortable: false }
+                        ],
+                        "order": [[1, "asc"]]
+                    });
+                    setTimeout(function () {
+                        SRTable.draw();
+                    }, 1500);
+
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Searching /" + thrownError);
+                }
+            });
+        }, 500);
+        setTimeout(function () {
+            $("#SearchBox").focus();
+        }, 500)
+    }
+    function fn_AdvancedSearch() {
+        $("#ParentList").val(0);
+        $("#ChildList").val(0);
+        $("#GrandchildList").val(0);
+        $('#AdvancedSearchDiv').modal('show');
+        $("#AdvSearchBox").val("");
+        $("#AdvSearchBox").focus();
+    }
+    function doDelayedSearch(e) {
+        $("#ClearSearch").show();
+        if (e.key == 'Enter')
+            doSearch(); //this is your existing function
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+        timeout = setTimeout(function () {
+            doSearch(); //this is your existing function
+        }, 2000);
+    }
+    function fn_ClearSearch() {
+        $("#ClearSearch").hide();
+        var mpw = $('#myPleaseWait').is(':hidden');
+        var sr = $('#SearchResult').is(':visible');
+        if (mpw && sr) {
+            setTimeout(function () {
+                $("#SearchBox").val("");
+                $("#SearchResult").hide();
+            }, 250)
+        }
+        $("#SearchBox").val("");
+        $("#SearchBox").focus();
+    }
+    function doSearch() {
+        var Search = $("#SearchBox").val();
+        if (Search != vSearch) {
+            $('#myPleaseWait').modal('show');
+            var Search = $("#SearchBox").val();
+            vSearch = Search;
+            setTimeout(function () {
+                if (Search.length == 0) {
+                    $("#SearchResult").hide();
+                    $('#myPleaseWait').modal('hide');
+                } else {
+                    var URL = "ExchangeSearch";
+                    $.ajax({
+                        type: "POST",
+                        data: {
+                            Input: Search,
+                            ParentID: 0,
+                            ChildID: 0,
+                            GrandchildID: 0
+                        },
+                        cache: false,
+                        aysnc: true,
+                        url: URL,
+                        success: function (result) {
+                            var foot = result.length + "&nbsp;events&nbsp;found.";
+                            var SearchResultTable = $("#SearchResultTable").DataTable().destroy();
+                            $("#SearchResultTable tbody").empty();
+                            $.each(result, function (key, value) {
+
+                                var Text = value.Event;
+                                var Text2 = Text.toLowerCase();
+                                var Search2 = Search.toLowerCase();
+                                var FindAt = Text2.indexOf(Search2);
+                                var TextNew = "<span style=\"display:inline\">" + value.EventDate + ' - ' + value.Status + " - " + Text.substr(0, FindAt) + "</span><span style=\"display:inline; font-weight:bold; color:#525252\">" + Search + "</span><span style=\"display:inline;\">" + Text.substring(FindAt + Search.length, 200) + ' - ' + value.Venue + "</span>";
+
+                                var NewRec = "<tr id=\"Search_" + value.Event_ID + "\" onclick=\"fn_SelectEvent(" + value.Event_ID + ");\">" +
+                                    "<td class='TableTd' style='border:thin black 1px;'>" + value.SortDate +
+                                    "</td><td>" + "<div class=\"SearchResult1\">" + TextNew + "</div>" +
+                                    "</td></tr>";
+                                $("#SearchResultTable > tbody").append(NewRec);
+                            })
+                            var SearchResultTable = $('#SearchResultTable').DataTable({
+                                "destroy": true,
+                                "scrollY": '300px',
+                                "scrollCollapse": true,
+                                "paging": false,
+                                "searching": false,
+                                "autoWidth": true,
+                                "info": false,
+                                "columnDefs": [
+                                    { visible: false, targets: [0] },
+                                ],
+                                "footerCallback": function (tfoot, data, start, end, display) {
+                                    $(tfoot).find('th').eq(0).html(foot);
+                                }
+                            });
+                            $("#SearchResult").show();
+                            $('#myPleaseWait').modal('hide');
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            $('#myPleaseWait').modal('hide');
+                            alert("Error: Searching /" + thrownError);
+                        }
+                    });
+                }
+            }, 500);
+            setTimeout(function () {
+                $("#SearchBox").focus();
+            }, 500)
+        }
+    }
+
+    $(document).keyup(function (e) {
+        if ($("#AdvSearchBox").is(":focus") && (e.keyCode == 13)) {
+            fn_Continue();
+        }
+    });
+
+    $(document).ready(function () {
+        $(".NavBar").css("background-color", "");
+        $("#SE").css("background-color", "#353535");
+        if ($(window).width() > 1135) {
+            $("#IconBar2").show();
+            $("#wrapper").toggleClass("toggled");
+        } else
+            $("#IconBar").show();
+
+        $("#SearchWrapperDiv").show();
+        $("#LoginWrapper").show();
+        $("#SearchBox").attr("placeholder", "Search Exchange Events");
+        $("#BTCountry").val(217);
+        $("#STState").val(@ViewBag.State_ID);
+        $("#STCountry").val(@ViewBag.Country_ID);
+        VendorTable = $('#VendorTable').DataTable({
+            "ordering": true,
+            "scrollY": '40vh',
+            "scrollCollapse": true,
+            "paging": false,
+            "searching": true,
+            "info": false,
+            "autowidth": false,
+        });
+        $("#SearchBox").focus();
+
+    });
+</script>
+}
+<div style="display:block; width:100%; text-align:center;float:left;">
+    <div style="margin:0 auto; width:900px;">
+        <div style="clear:both; display:block; width:360px; margin:10px; margin-left:50px; padding:5px; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75); float:left;">
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; float:left; font-weight:bold; font-size:18pt;">Vendor</label>
+                <label for="TaxExempt" style="margin:5px; margin-top:13px;">STH Only</label><input class="InputOption" type="checkbox" id="STHOnly" checked="checked" onchange="fn_CartTotal();" />
+                <a href="#" style="float:right; font-weight:bold; margin-right:10px; margin-top:10px;" onclick="fn_VendorSearch();">Search</a>
+                <a href="#" style="float:right; font-weight:bold; margin-right:10px; margin-top:10px;" onclick="fn_VendorClear();">Reset</a>
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Company</label><input autocomplete="nope" class="InputOption" id="VCompany" maxlength="100" style="width:267px;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">First Name</label><input autocomplete="nope" class="InputOption" id="VFirst" maxlength="100" style="width:100px; margin-left:6px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">Last Name</label><input autocomplete="nope" class="InputOption" id="VLast" maxlength="200" style="margin-left:1px; width:100px; float:left;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Address1</label><input autocomplete="nope" class="InputOption" id="VAddress1" maxlength="100" style="width:267px;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Address2</label><input autocomplete="nope" class="InputOption" id="VAddress2" maxlenght="100" style="width:267px;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">City</label><input autocomplete="nope" class="InputOption" id="VCity" maxlength="100" style="margin-left:6px; width:108px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">State</label><div style="float:left;">@Html.DropDownList("StateList", null, new { @class = "InputOption RoundedDropDown", @id = "VState", @style = "height:22px; max-width:45px;" })</div>
+                <label style="margin:5px; float:left; font-weight:bold;">Zip</label><input autocomplete="nope" class="InputOption" id="VZip" maxlength="25" style="width:50px; float:left;" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Country</label><div style="float:left;">@Html.DropDownList("CountryList", null, new { @class = "InputOption RoundedDropDown", @id = "VCountry", @style = "margin-left:6px; height:22px; width:267px;", @onchange = "fn_GetStateList(this.value, 'BTState');" })</div>
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Email</label><input autocomplete="nope" class="InputOption" id="VEmail" maxlength="500" style="margin-left:6px; width:123px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">Phone</label><input autocomplete="nope" class="InputOption" id="VPhone" maxlength="100" style="width:100px; float:left;" />
+            </div>
+        </div>
+        <div style="display:block; width:360px; margin:10px; margin-right:50px; padding:5px; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75); float:right;">
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; float:left; font-weight:bold; font-size:18pt;">Ship To</label>
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Company</label><input autocomplete="nope" class="InputOption" id="STCompany" maxlength="100" style="width:267px;" value="@ViewBag.Company" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">First Name</label><input autocomplete="nope" class="InputOption" id="STFirst" maxlength="100" style="width:100px; margin-left:6px; float:left;" value="@ViewBag.First" />
+                <label style="margin:5px; float:left; font-weight:bold;">Last Name</label><input autocomplete="nope" class="InputOption" id="STLast" maxlength="200" style="margin-left:1px; width:100px; float:left;" value="@ViewBag.Last" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Address1</label><input autocomplete="nope" class="InputOption" id="STAddress1" maxlength="100" style="width:267px;" value="@ViewBag.Address1" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Address2</label><input autocomplete="nope" class="InputOption" id="STAddress2" maxlength="100" style="width:267px;" value="@ViewBag.Address2" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">City</label><input autocomplete="nope" class="InputOption" id="STCity" maxlength="100" style="margin-left:6px; width:108px; float:left;" value="@ViewBag.City" />
+                <label style="margin:5px; float:left; font-weight:bold;">State</label><div style="float:left;">@Html.DropDownList("StateList", null, new { @class = "InputOption RoundedDropDown", @id = "STState", @style = "height:22px; max-width:45px;" })</div>
+                <label style="margin:5px; float:left; font-weight:bold;">Zip</label><input autocomplete="nope" class="InputOption" id="STZip" maxlength="25" style="width:50px; float:left;" value="@ViewBag.Zip" />
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Country</label><div style="float:left;">@Html.DropDownList("CountryList", null, new { @class = "InputOption RoundedDropDown", @id = "STCountry", @style = "margin-left:6px; height:22px; width:267px;", @onchange = "fn_GetStateList(this.value, 'STState');" })</div>
+            </div>
+            <div style="width:100%; float:left;">
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Email</label><input autocomplete="nope" class="InputOption" id="STEmail" maxlength="500" style="margin-left:6px; width:123px; float:left;" value="@ViewBag.Email" />
+                <label style="margin:5px; float:left; font-weight:bold;">Phone</label><input autocomplete="nope" class="InputOption" id="STPhone" maxlength="100" style="width:100px; float:left;" value="@ViewBag.Phone" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="CartTableDiv" style="width:98%; margin-left:10px; margin-top:10px; background-color:transparent; float:left; display:block">
+    <table id="CartTable" class="table-bordered" style="width:100%; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+        <thead>
+            <tr style="height:30px;">
+                <th></th>
+                <th>Event</th>
+                <th>Date</th>
+                <th>Venue</th>
+                <th>SSF</th>
+                <th style="max-width:40px;">Qty</th>
+                <th>Sec</th>
+                <th>Row</th>
+                <th style="max-width:40px;">Min</th>
+                <th style="max-width:40px;">Max</th>
+                <th style="max-width:80px;">Donation</th>
+                <th style="max-width:80px;">Cost</th>
+                <th style="max-width:80px;">Price</th>
+                <th>Stock</th>
+                <th>Shipping</th>
+                <th>Notes</th>
+                <th>Inhand</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="Bottom" style="display:flex; width:100%; margin:20px; justify-content:space-around; float:left;">
+        <div id="BottomLeft" style="display:inline-block; width:155px; height:140px; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+            <label style="margin:5px; font-weight:bold; float:left;">PO Notes:</label>
+            <textarea class="InputOption" id="InvoiceNotes" style="margin-left:5px; float:left; clear:both; height:80%; width:93%;"></textarea>
+        </div>
+        <div id="BottomCenter" style="display:inline-block; width:440px;">
+            <div style="float:left; width:100%; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+                <label style="margin:5px; margin-top:10px; font-weight:bold; float:left;">New Payment:</label>
+                <div style="float:left; margin:5px;">@Html.DropDownList("PayTypeList", null, new { @class = "RoundedDropDown" })</div>
+                <label style="margin:5px; margin-top:10px; font-weight:bold; float:left;">Amount:</label>
+                <input id="PayAmt" style="margin-top:8px; text-align:right; width:75px; float:left;" onclick="this.select();" value="$0.00" onchange="fn_UpdatePayAmt();" />
+                <button style="font-size:10pt; margin-top:6px; background-color:#adc72e; float:right; margin-right:5px;" onclick="fn_AddPayment();">Add</button>
+            </div>
+            <div style="float:left; width:100%; height:100px; margin-top:20px; background-color:transparent;">
+                <table id="PayTable" class="table-bordered" style="border-radius:4px; background-color:#ffffff; width:100%; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Note</th>
+                            <th style="text-align:right; max-width:75px;">Amount</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div id="BottomRight" style="display:inline-block;">
+            <div id="TotalDiv" style="float:right; display:block; margin-right:30px; padding:10px; font-weight:bold; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+                <div id="DonDiv" style="clear:both; float:right;">Donation Total&nbsp;<input id="DonTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+                <div id="CostDiv" style="clear:both; float:right;">Cost Total&nbsp;<input id="CostTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+                <div id="TotalDiv" style="clear:both; float:right;">Order Total&nbsp;<input id="CartTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+                <div id="PaymentDiv" style="clear:both; float:right;">Payment(s)&nbsp;<input id="CartPayTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+                <div id="BalanceDiv" style="clear:both; float:right;">Balance&nbsp;<input id="CartBalance" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+                <div id="CreateDiv" style="clear:both; float:left; width:100%; text-align:center; display:none;">
+                    <button style="font-size:10pt; margin-top:6px; background-color:#adc72e;" onclick="fn_CompletePurchase();">Create PO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<!--BEGIN MODAL-->
+<div class="modal loadingModal bs-example-modal-sm" id="AdvancedSearchDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:rgb(214,228,249);">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" style="color:white; margin-top:15px; float:left;">Advanced Search</h1>
+            </div>
+            <div class="modal-body" style="padding:0px;">
+                <div style="width:100%; text-align:center;">
+                    <div style="display:inline-block;">
+                        <div style="display:inline-block; margin:0 auto; float:left;">
+                            <div id="FromDate" style="margin:5px; display:block; float:left;">
+                                <h1 style="width: 31px;height: 16px;font-size: 13px;font-weight: 700;line-height: 1.23;color: #353535; display:block;">From</h1>
+                                <div class="input-group date" data-provide="datepicker" style="width:130px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5;">
+                                    <input type="text" id="StartDateAdv" class="form-control" style="background-color:transparent; border:none;" value="@Session["StartDate"]">
+                                    <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                                        <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="ToDate" style="margin:5px; display:block; float:left;">
+                                <h1 style="width: 31px;height: 16px;font-size: 13px;font-weight: 700;line-height: 1.23;color: #353535;">To</h1>
+                                <div class="input-group date" data-provide="datepicker" style="width:130px; border-radius:4px; background-color:#ffffff;box-shadow: 0 1px 2px 0 rgba(53, 53, 53, 0.08);border: solid 1px #e5e5e5;">
+                                    <input type="text" id="EndDateAdv" class="form-control" style="background-color:transparent; border:none;" value="@Session["EndDate"]">
+                                    <div class="input-group-addon" style="background-color:transparent; margin-top:7px; margin-right:7px; border:none;">
+                                        <i class="material-icons" style="color:#adc72e; width:20px; height:20px; margin:0px;">today</i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display:inline-block; clear:both; float:left; margin-top:10px;">
+                            <label for="SearchBox2" style="margin:5px; display:inline-block; float:left;">Text</label>
+                            <input id="AdvSearchBox" class="SearchBox" placeholder="Search Exchange Events" style="padding-left:5px; box-shadow:0 1px 2px 0; border:solid grey 1px; border-radius:4px; color:black; background-color:white; width:220px;" autofocus="" onkeypress="fn_AdvSearch();">
+                        </div>
+                        <div style="display:inline-block; clear:both; float:left; margin-top:10px;">
+                            <label for="ParentList" style="margin:5px; display:inline-block; float:left;">Parent</label>
+                            @Html.DropDownList("ParentList", null, new { @class = "RoundedDropDown", @style = "display:inline-block;", @onchange = "$('#AdvSearchBox').focus();" })
+                        </div>
+                        <div style="display:inline-block; clear:both; float:left; margin-top:10px;">
+                            <label for="ChildList" style="margin:5px; display:inline-block; float:left;">Child</label>
+                            @Html.DropDownList("ChildList", null, new { @class = "RoundedDropDown", @style = "display:block;", @onchange = "$('#AdvSearchBox').focus();" })
+                        </div>
+                        <div style="display:inline-block; clear:both; float:left; margin-top:10px;">
+                            <label for="GrandchildList" style="margin:5px; display:inline-block; float:left;">Grandchild</label>
+                            @Html.DropDownList("GrandchildList", null, new { @class = "RoundedDropDown", @style = "display:block;", @onchange = "$('#AdvSearchBox').focus();" })
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="text-align:center; width:100%;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_Continue();">Search</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal bs-example-modal-lg" id="SearchResult2Div" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:rgb(214,228,249);">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 class="-Info" id="Title2" style="color:white; font-size:28px; float:left;">Advanced Search</h1>
+            </div>
+            <div class="modal-body" style="padding:0px;">
+                <div style="width:100%; text-align:center;">
+                    <div style="display:inline-block;">
+                        <div style="margin-left:20px; margin-right:20px;">
+                            <table id="SearchResult2Table" class="table-bordered table-condensed" align="center" style="border-radius:4px; background-color:white;" border="0">
+                                <thead>
+                                    <tr style="height:30px;">
+                                        <th style="text-align:center;"></th>
+                                        <th style="text-align:center;">Date</th>
+                                        <th style="text-align:center;">Status</th>
+                                        <th style="text-align:center;">Event</th>
+                                        <th style="text-align:center;">Venue</th>
+                                        <th>SortDate</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="text-align:center; width:100%; margin-top:-5px;">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="fn_AddAdvancedSearch();">Add Selected Event(s)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="VendorSearchDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#2e68a3; width:1000px;">
+            <div class="modal-body">
+                <table id="VendorTable" class="table-bordered" style="width:100%;border-radius:4px; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08); background-color:white;" border="0">
+                    <thead>
+                        <tr style="height:30px;">
+                            <th style="text-align:center;">Type</th>
+                            <th style="text-align:center;">Company</th>
+                            <th style="text-align:center;">First</th>
+                            <th style="text-align:center;">Last</th>
+                            <th style="text-align:center;">Address1</th>
+                            <th style="text-align:center;">Address2</th>
+                            <th style="text-align:center;">City</th>
+                            <th style="text-align:center;">State</th>
+                            <th style="text-align:center;">Zip</th>
+                            <th style="text-align:center;">Country</th>
+                            <th style="text-align:center;">Email</th>
+                            <th style="text-align:center;">Phone</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer" style="display:flex; align-items:center; justify-content:center;">
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="display:flex; justify-content:center; background-color:#aec72d; color:#ffffff;" onclick="$('#SearchBox').select()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="CreditCardDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog" style="border-radius:4px;">
+        <div class="modal-content modal-sm" style="border-radius:6px; background-color:#ecf2f9;" ">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <div style="margin-left:10px; width:80%; float:left;">
+                    <label style="font-size:18pt; margin-top:20px; margin-left:30px; font-weight:500; color:#ffffff; max-width:80%; float:left;">Select Credit Card</label>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div style="clear:both; display:block; margin:5px; width:100%; align-content:center;">
+                    @Html.DropDownList("CCList", null, new { @class = "InputOption RoundedDropDown", @id = "CCList", @style = "max-width:240px;"})
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex; align-items:center; justify-content:center;">
+                <button type="button" class="btn btn-default" style="background-color:#aec72d; color:#ffffff;" onclick="fn_PickCC();">Continue</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

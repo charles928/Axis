@@ -1,0 +1,318 @@
+﻿@{
+    ViewBag.Title = "STH Calendar";
+}
+@section scripts {
+    <link rel="stylesheet" type="text/css" href="~/Content/timepicki.css">
+    <script type="text/javascript">
+        var vHeadliner_ID = 0;
+        var vSelectedCB_ID = new Array();
+        var vSelectedLogin = new Array();
+        var vSelectedDate;
+        var AccountTable;
+
+        function fn_CloseAccounts()
+        {
+            $("#HeadlinerList").val(0);
+            $("#AccountTableDiv").hide();
+        }
+        function fn_AddAccounts() {
+            vSelectedCB_ID.length = 0; //Clear array
+            var SelectedAccounts = "";
+            var NewMessage = $("#HeadlinerList option:selected").text() + " (" + $("#Type option:selected").text() + ")" + String.fromCharCode(13);
+
+            $(".ExCheckBox").each(function (i, e) {
+                var id = $(this).attr('id');
+                if(id != "Check_0" && $("#" + id).prop("checked") == true)
+                {
+                    var CB_ID = id.replace("Check_", "");
+                    var First = $("#" + id.replace("Check", "First")).text();
+                    var Last = $("#" + id.replace("Check", "Last")).text();
+                    var Account = $("#" + id.replace("Check", "Account")).text();
+                    var Email = $("#" + id.replace("Check", "Email")).text();
+                    var Password = $("#" + id.replace("Check", "Password")).text();
+                    vSelectedCB_ID.push(CB_ID);
+                    SelectedAccounts += '   ' + First + ' ' + Last + ' - ' + Account + ' (' + Email + ' ' + Password + ')' + String.fromCharCode(13);
+                }
+                $("#AccountTableDiv").hide();
+                $("#HeadlinerList").val(0);
+            })
+            NewMessage = NewMessage + SelectedAccounts;
+            $("#MessageText").val(NewMessage);
+        }
+        function fn_ChangeAll()
+        {
+            if ($("#Check_0").prop("checked")) {
+                $(".ExCheckBox").prop("checked", true);
+            } else {
+                $(".ExCheckBox").prop("checked", false);
+            }
+        }
+        function fn_ChangeHeadliner()
+        {
+            $("#Check_0").prop('checked', false);
+            vHeadliner_ID = $("#HeadlinerList").val();
+            if (vHeadliner_ID == 0)
+                $("#AccountTableDiv").hide();
+            else {
+                $("#AccountTable").DataTable().destroy();
+                $("#AccountTable > tbody").empty();
+                $.ajax({
+                    url: "/Season/GetAccountsForHeadliner?Headliner_ID=" + vHeadliner_ID,
+                    async: false,
+                    type: "GET",
+                    success: function (response) {
+                        $("#AccountTable > TBODY").empty();
+                        jQuery.each(response, function (index, item) {
+                            var NewRow = "<tr><td><input class=\"ExCheckBox\" id=\"Check_" + item.Client_Broker_ID + "\" type=\"CheckBox\" ></td>";
+                            NewRow += "<td id=\"First_" + item.Client_Broker_ID + "\" style=\"text-align:left;\">" + item.First + "</td>";
+                            NewRow += "<td id=\"Last_" + item.Client_Broker_ID + "\" style=\"text-align:left;\">" + item.Last + "</td>";
+                            NewRow += "<td id=\"Account_" + item.Client_Broker_ID + "\" style=\"text-align:left;\">" + item.Account + "</td>";
+                            NewRow += "<td id=\"Email_" + item.Client_Broker_ID + "\" style=\"text-align:left;\">" + item.Email + "</td>";
+                            NewRow += "<td id=\"Password_" + item.Client_Broker_ID + "\" style=\"text-align:left;\">" + item.Password + "</td>";
+                            NewRow += "</tr>";
+                            $("#AccountTable > TBODY").append(NewRow);
+                        });
+                        $("#AccountTableDiv").show();
+                        AccountTable = $('#AccountTable').DataTable({
+                            "ordering": true,
+                            "scrollY": '120px',
+                            "scrollCollapse": true,
+                            "paging": false,
+                            "searching": true,
+                            "info": false,
+                            "autowidth": false,
+                            "order": [[1, "asc"]],
+                            "columnDefs": [
+                                { targets: [0], orderable: false }
+                            ]
+                        });
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert('Error updating ' + Type + ': ' + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_RemoveUser(ID, Name)
+        {
+            vSelectedLogin.splice($.inArray(Name + ', ', vSelectedLogin), 1);
+            var ExistingText = $("#SelectedUserList").html().replace(Name + ', ', '');
+            $("#SelectedUserList").html(ExistingText);
+        }
+        function findIn2dArray(arr_2d, val) {
+            var indexArr = $.map(arr_2d, function (arr, i) {
+                if ($.inArray(val, arr) != -1) {
+                    return 1;
+                }
+
+                return -1;
+            });
+            return indexArr.indexOf(1);
+        }
+        function fn_AddUser()
+        {
+            var NewID = $("#UserList").val();
+            var NewName = $("#UserList option:selected").text();
+
+            if (findIn2dArray(vSelectedLogin, NewID) == -1) {//not already in array
+                vSelectedLogin.push([NewID, NewName]);
+
+                var ExistingText = "";
+                jQuery.each(vSelectedLogin, function (key, value) {
+                    ExistingText += "<a href='#' onclick=\"fn_RemoveUser(" + value[0] + ", '" + value[1] + "');\" style='color:yellow'>" + value[1] + ', </a>';
+                });
+                $("#SelectedUserList").html(ExistingText);
+            }
+        }
+        function fn_AddNotice()
+        {
+            var SelectedTime = $("#TimePick").val();
+            var Type_ID = $("#Type").val();
+            var Note = $("#MessageText").val();
+            var UserList = JSON.stringify(vSelectedLogin);
+            var BrokerList = JSON.stringify(vSelectedCB_ID);
+
+            var URL = "../Season/SendInvite";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Date: vSelectedDate,
+                    Time: SelectedTime,
+                    Type: Type_ID,
+                    Headliner: vHeadliner_ID,
+                    Users: UserList,
+                    Brokers: BrokerList,
+                    Message: Note
+                },
+                url: URL,
+                success: function (result) {
+                    if (result != "success")
+                        alert(result);
+                    else
+                        location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating Headliner /" + thrownError);
+                    $("#" + Name + "_" + ClientBroker_ID).val(vOldValue);
+                    $("#" + Name + "_" + ClientBroker_ID).select();
+                }
+            });
+        }
+        function fn_LoadCalendarDD()
+        {
+            $.ajax({
+                url: "/Season/GetCalendarDD",
+                type: 'GET',
+                success: function (response) {
+                    jQuery.each(response, function (index, item) {
+                        var val = item.Login_ID;
+                        var text = item.FullName;
+
+                        $("#TopDD").append("<option value=" + val + ">" + text + "</option>");
+                    });
+                    $("#TopDDDiv").show();
+                    $("#TopDD").val(@Session["STH_ID"]);
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Error getting calendar drop down: ' + thrownError);
+                }
+            });
+        }
+        function fn_ChangeTopDD()
+        {
+            var NewValue = $("#TopDD").val();
+
+            $.ajax({
+                url: "/Season/ChangeSTH_ID?New_ID=" + NewValue,
+                type: 'GET',
+                success: function (response) {
+                    $('#calendar').fullCalendar('refetchEvents');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert('Error changing user: ' + thrownError);
+                }
+            });
+        }
+
+        $(document).ready(function () {
+            $("#SearchWrapper8").show();
+            fn_LoadCalendarDD();
+            $("#LoginWrapper").show();
+
+            $(".time_element").timepicki();
+
+            $('#calendar').fullCalendar({
+                navLinks: true,
+                eventLimit: true,
+                allDayDefault: false,
+                eventClick: function (eventObj) {
+                        popupWindow(eventObj.url, "", 850, 600)
+                        return false; // prevents browser from following link in current tab.
+                },
+                dayClick: function (date, jsEvent, view) {
+                    $("#HeadlinerList").val(0);
+                    $("#UserList").val(0);
+                    $("#Type").val(1);
+                    $("#SelectedUserList").text("");
+                    vSelectedCB_ID.length = 0;
+                    vSelectedLogin.length = 0;
+                    vSelectedDate = date.format("MM/DD/YYYY");
+                    $("#AccountTableDiv").hide();
+                    $("#PopupTitle").text(date.format('ddd') + ' ' + vSelectedDate);
+                    $("#MessageText").val("");
+                    $("#EventAddDiv").modal('show');
+                    $('#calendar')
+                },
+                header: {
+            		left: 'prev,next today',
+            		center: 'title',
+            		right: 'month,agendaWeek,agendaDay'
+				},
+            	firstDay: 1, //The day that each week begins (Monday=1)
+            	slotMinutes: 60,
+            	events: '@Url.RouteUrl(new{ action="GetEvents", controller="Season"})'
+            });
+
+            AccountTable = $('#AccountTable').DataTable({
+                "ordering": true,
+                "scrollY": '140px',
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": true,
+                "info": false,
+                "autowidth": false,
+                "order": [[1, "asc"]]
+            });
+        });
+    </script>
+}
+
+<div class="container">
+    <div style="margin:10px; padding:5px; border-radius:4px; background-color:aliceblue; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.28); " id='calendar'></div>
+</div>
+
+<!--modal begins-->
+<div class="modal loadingModal" id="EventAddDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-lg" style="border-radius:4px;">
+        <div class="modal-content" style="border-radius:6px; background-color:#2e68a3;">
+            <div class="modal-header" style="margin:10px; height:60px; border-radius:6px; background-color:#1c81db; padding:0px; text-align:center;">
+                <div style="float:left; margin-left:auto; margin-right:auto; margin-top:10px;">
+                    <label id="PopupTitle" style="margin-top:3px; color:white; font-size:18pt; float:left;"></label>
+                    <div style="margin-left:5px; float:left; display:block;"><input type="text" id="TimePick" name="timepicker" class="time_element" value="09:00 AM" style="background-color:transparent; color:white; font-size:18pt; font-weight:100; width:100px;" /></div>
+                </div>
+            </div>
+            <div id="SelectedUserList" style="margin-left:10px; width:100%; color:yellow; display:block; float:left;"></div>
+            <div class="modal-body">
+                <div style="float:left;">
+                    <table>
+                        <tr>
+                            <td style="text-align:right; color:white;">Type:</td>
+                            <td>
+                                <select class="RoundedDropDown" id="Type" style="margin:4px;">
+                                    <option value=1>Donation</option>
+                                    <option value=2>Seat Selection</option>
+                                    <option value=3>Renewal</option>
+                                    <option value=4>Request</option>
+                                    <option value=5>Deposit</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr><td style="text-align:right; color:white;">Performer:</td><td>@Html.DropDownList("HeadlinerList", null, new { @class = "RoundedDropDown", @style = "max-width:180px; display:inline-block; margin:4px; float:left;", @onchange = "fn_ChangeHeadliner();" })</td></tr>
+                        <tr><td style="text-align:right; color:white;">Users:</td><td>@Html.DropDownList("UserList", null, new { @class = "RoundedDropDown", @style = "display:inline-block; margin:4px;", @onchange = "fn_AddUser();" })</td></tr>
+                        <tr>
+                            <td colspan="2">
+                                <button type="button" class="btn btn-default" style="margin-left:40px; margin-right:20px; margin-top:10px; float:left; display:flex; background-color:#aec72d; color:#ffffff;" onclick="fn_AddNotice();">Send</button>
+                                <button type="button" class="btn btn-default" data-dismiss="modal" style="margin-top:10px; float:left; display:flex; background-color:#aec72d; color:#ffffff;" onclick="$('#SearchBox').select()">Close</button>
+                            </td>
+                        </tr>
+                    </table>
+                    <div class="CSSTableGenerator" id="AccountTableDiv" style="position:absolute; margin-left:260px; margin-top:-185px; display:none; float:left;">
+                        <table id="AccountTable" class="table-responsive" style="padding:4px; background-color:white; border-radius:4px;" border="0">
+                            <thead>
+                                <tr style="height:30px;">
+                                    <th><input class="ExCheckBox" id="Check_0" type="CheckBox" onclick="fn_ChangeAll();"></th>
+                                    <th>First</th>
+                                    <th>Last</th>
+                                    <th>Account</th>
+                                    <th>Email</th>
+                                    <th>Password</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                            <tfoot>
+                                <tr style="height:30px;">
+                                    <th colspan="6" style="text-align:center"><a href="#" onclick="fn_AddAccounts();">Add Accounts</a> - <a href="#" onclick="fn_CloseAccounts();">Close</a></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                </div>
+                <div style="float:left;">
+                    <textarea id="MessageText" rows="10" cols="120" style="background-color:lightgray; margin-left:10px; max-width:480px;"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

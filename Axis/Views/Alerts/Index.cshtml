@@ -1,0 +1,23 @@
+﻿@{
+    ViewBag.Title = "Alerts";
+}
+@section scripts {
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $(".NavBar").css("background-color", "");
+            $("#AL").css("background-color", "#353535");
+            if ($(window).width() > 1135) {
+                $("#IconBar2").show();
+                $("#wrapper").toggleClass("toggled");
+            } else
+                $("#IconBar").show();
+            $("#SearchWrapper8").show();
+            $("#LoginWrapper").show();
+        });
+    </script>
+}
+<div id="MyDashboardWrapper" style="margin-top:-70px; background-color:transparent; z-index:1;">
+    <div class="MainDiv" style="clear:both; display:block; text-align:center; width:99%; max-width:99%; float:left; position:relative;">
+        <label style="color:white; font-size:24pt; font-weight:300; line-height:1.27; float:left;">Alerts (Masters is now under the Masters menu tab)</label>
+    </div>
+</div>

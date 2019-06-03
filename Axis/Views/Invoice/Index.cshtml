@@ -1,0 +1,483 @@
+﻿@{
+    ViewBag.Title = "Invoice List";
+}
+@section scripts {
+    <script type="text/javascript">
+        var vSearch = 'starting';
+        var table;
+        var foot;
+        var InvoiceCount;
+        var InvoiceQty;
+        var InvoicePrice;
+        var InvoiceProfit;
+        var InvoiceNumber;
+        var CurrentData;
+        var CurrentMode = 'Fulfill';
+
+        function fn_ToggleDisplayMode() {
+            if (CurrentMode == "Fulfill")
+                CurrentMode = "Profit";
+            else
+                CurrentMode = "Fulfill";
+            fn_DisplayInvoiceList();
+        }
+        function fn_KeyUpTracking(e) {
+            if (e.key == 'Enter') {
+                var TrackingNumber = $("#TrackingNumber").val();
+                var URL = "../Invoice/UpdateTracking";
+                $.ajax({
+                    type: 'POST',
+                    data: {
+                        Type: 'Delivered',
+                        Invoice: InvoiceNumber,
+                        Tracking: TrackingNumber
+                    },
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        $("#Status_" + InvoiceNumber).text('Delivered');
+                        $("#Status_" + InvoiceNumber).attr('title', result);
+                        $("#Method_" + InvoiceNumber).attr('title', TrackingNumber);
+                        $("#TrackingNumber").val("");
+                        $("#TrackingDiv").css('display', 'none');
+                        $("#SearchBox2").val("");
+                        $("#SearchBox2").focus();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert("Error: Updating Invoice Status /" + thrownError);
+                    }
+                });
+            }
+        }
+        function doDelayedSearch2(e) {
+            if (e.key == 'Enter')
+                doSearch(); //this is your existing function
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            timeout = setTimeout(function () {
+                doSearch(); //this is your existing function
+            }, 2000);
+        }
+        function fn_EnterSearch() {
+            $("#TrackingDiv").css('display', 'none');
+            $('#SearchBox2').select();
+        }
+        function fn_ChangeStatus() {
+            $('#TR_' + InvoiceNumber).css('background-color', '');
+            var URL = "../Invoice/UpdateTracking";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Type: 'Shipment Pending',
+                    Invoice: InvoiceNumber,
+                    Tracking: "0"
+                },
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#ChangeStatusDiv").modal('hide');
+                    $("#Change_" + InvoiceNumber).val(1);
+                    $("#Status_" + InvoiceNumber).text('Shipment Pending');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Updating Invoice Status /" + thrownError);
+                }
+            });
+        }
+        function fn_StatusChange(Invoice_ID) {
+            var Status = $("#Status_" + Invoice_ID).text();
+            var Change = $("#Change_" + Invoice_ID).val();
+            if (Status == 'Shipped' || Status == 'Delivered')
+            {
+                if (Change == 1)
+                {
+                    InvoiceNumber = Invoice_ID;
+                    $('#TR_' + Invoice_ID).css('background-color', 'lightblue');
+                    $("#CSTitle").text("Invoice " + Invoice_ID);
+                    $("#ChangeStatusDiv").modal('show');
+                }
+                else
+                {
+                    alert('Unable to make requested change, reversion is only allowed on the same day.');
+                }
+            }
+            else
+            {
+                $("#SearchBox2").focus();
+                $("#SearchBox2").val('');
+                alert('You must search for this invoice to complete it.')
+            }
+        }
+        function fn_DeliveryMethod(Invoice_ID) {
+            InvoiceNumber = Invoice_ID;
+            var Status = $("#Status_" + Invoice_ID).text();
+            if (Status == 'Shipment Pending') {
+                var CurrentSM_ID = $("#SM_" + Invoice_ID).val();
+                $('#TR_' + Invoice_ID).css('background-color', 'lightblue');
+                $("#ShippingMethod").val(CurrentSM_ID);
+                $("#SMTitle").text("Invoice " + Invoice_ID);
+                $("#ChangeSMDiv").modal('show');
+            }
+            else
+                alert("Unable to updates shipping method on order with status of " + Status);
+        }
+        function fn_ChangeMethod() {
+            var CurValue = $("#SM_" + InvoiceNumber).val();
+            var NewValue = $("#ShippingMethod").val();
+            var NewText = $("#ShippingMethod option:selected").text();
+            if (CurValue == NewValue)
+            {
+                $('#TR_' + InvoiceNumber).css('background-color', '');
+                $("#ChangeSMDiv").modal('hide');
+                alert('no change');
+            }
+            else
+            {
+                var URL = "../Invoice/UpdateMethod";
+                $.ajax({
+                    type: 'POST',
+                    data: {
+                        Invoice: InvoiceNumber,
+                        Method_ID: NewValue
+                    },
+                    cache: false,
+                    aysnc: false,
+                    url: URL,
+                    success: function (result) {
+                        $("#SM_" + InvoiceNumber).val(NewValue);
+                        $("#Method_" + InvoiceNumber).text(NewText);
+                        $('#TR_' + InvoiceNumber).css('background-color', '');
+                        $("#ChangeSMDiv").modal('hide');
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alert("Error: Updating Invoice Method /" + thrownError);
+                    }
+                });
+            }
+        }
+        function fn_CloseAdvancedSearch() {
+            $('.modal.in:visible').modal('hide');
+        }
+        function fn_SelectInvoice(Invoice) {
+            var w = 860;
+            var h = 900;
+            var URL = "../Invoice/GetInvoice?Invoice_ID=" + Invoice + "&AutoPrint=false";
+            popupWindow(URL, Invoice, w, h);
+        }
+        function fn_DisplayInvoiceList() {
+            if (CurrentMode == "Fulfill")
+            {
+                table = $('#InvoiceTable').DataTable({
+                    "destroy": true,
+                    "ordering": true,
+                    "scrollY": '75vh',
+                    "scrollX": false,
+                    "scrollCollapse": true,
+                    "paging": false,
+                    "searching": false,
+                    "info": false,
+                    "order": [[0, "desc"]],
+                    "columnDefs": [
+                        { targets: [10,12,13,16, 17], visible: false },
+                        { iDataSort: 16, targets: [6] },
+                        { iDataSort: 17, targets: [1] }
+                    ],
+                    "footerCallback": function (tfoot, data, start, end, display) {
+                        $(tfoot).find('th').eq(0).html(InvoiceCount + " Invoices");
+                        $(tfoot).find('th').eq(3).html(InvoiceQty);
+                        $(tfoot).find('th').eq(4).html(formatCurrency(InvoicePrice));
+                        var buttonFooter = "<button type='button' id='DisplayMode' onclick='fn_ToggleDisplayMode();'>Profit</button>";
+                        $(tfoot).find('th').eq(6).html(buttonFooter);
+                    }
+                });
+                table
+                     .rows()
+                     .nodes()
+                     .to$()
+                     .addClass('TableTr'),
+                setTimeout(function () {
+                    table.draw();
+                }, 250);
+                setTimeout(function () {
+                    if (CurrentData[0].Invoice == vSearch && CurrentData[0].InvoiceCount == 1 && CurrentData[0].Status == "Shipment Pending") {
+                        InvoiceNumber = CurrentData[0].Invoice;
+                        $("#TrackingDiv").css('display', 'block');
+                        $("#TrackingNumber").val("");
+                        $("#TrackingNumber").focus();
+                    }
+                    else {
+                        $("#SearchBox2").focus();
+                        $("#SearchBox2").select();
+                    }
+                }, 250);
+                if (InvoiceCount == 2000)
+                    alert("Maximum number of invoices (2000) exceeded.");
+            }
+            else
+            {
+                table = $('#InvoiceTable').DataTable({
+                    "destroy": true,
+                    "ordering": true,
+                    "scrollY": '75vh',
+                    "scrollX": false,
+                    "scrollCollapse": true,
+                    "paging": false,
+                    "searching": false,
+                    "info": false,
+                    "columnDefs": [
+                        { targets: [2, 3, 14, 15, 16, 17], visible: false },
+                        { iDataSort: 16, targets: [6] },
+                        { iDataSort: 17, targets: [1] }
+                    ],
+                    "footerCallback": function (tfoot, data, start, end, display) {
+                        $(tfoot).find('th').eq(0).html(InvoiceCount + " Invoices");
+                        $(tfoot).find('th').eq(3).html(formatCurrency(InvoiceCost));
+                        $(tfoot).find('th').eq(4).html(formatCurrency(InvoicePrice));
+                        var profitFooter = "<a href='#' style='color:yellow;' title='Complex profit = " + formatCurrency(parseFloat(InvoicePrice) - parseFloat(InvoiceCost)) +"'>" + formatCurrency(InvoiceProfit) + "</a>";
+                        $(tfoot).find('th').eq(5).html(profitFooter);
+                        var buttonFooter = "<button type='button' id='DisplayMode' onclick='fn_ToggleDisplayMode();'>Fulfill</button>";
+                        $(tfoot).find('th').eq(6).html(buttonFooter);
+                    }
+                });
+                table
+                     .rows()
+                     .nodes()
+                     .to$()
+                     .addClass('TableTr'),
+                setTimeout(function () {
+                    table.draw();
+                }, 250);
+                setTimeout(function () {
+                    if (CurrentData[0].Invoice == vSearch && CurrentData[0].InvoiceCount == 1 && CurrentData[0].Status == "Shipment Pending") {
+                        InvoiceNumber = result[0].Invoice;
+                        $("#TrackingDiv").css('display', 'block');
+                        $("#TrackingNumber").val("");
+                        $("#TrackingNumber").focus();
+                    }
+                    else {
+                        $("#SearchBox2").focus();
+                        $("#SearchBox2").select();
+                    }
+                }, 250);
+                if (InvoiceCount == 2000)
+                    alert("Maximum number of invoices (2000) exceeded.");
+            }
+        }
+        function fn_DrawInvoices() {
+            foot = CurrentData.length + " events found.";
+            InvoiceCount = 0;
+            InvoiceQty = 0;
+            InvoiceCost = 0;
+            InvoicePrice = 0;
+            InvoiceProfit = 0;
+            $("#InvoiceTableDiv").show();
+            if (table != null) table.destroy();
+            $("#InvoiceTable tbody").empty();
+            $.each(CurrentData, function (key, value) {
+                InvoiceCount += 1;;
+                InvoiceQty += parseInt(value.Qty);
+                InvoiceCost += parseFloat(value.Cost);
+                InvoicePrice += parseFloat(value.Price);
+                InvoiceProfit += parseFloat(value.Profit);
+                //alert(parseFloat(value.Price) - parseFloat(value.Cost) + ' = ' + value.Profit + ' / ' + InvoiceProfit);
+
+                var NewRec = "<tr id=\"TR_" + value.Invoice + "\" style=\"border-radius: 4px; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);\">";
+                NewRec += "<td style='text-align:center;'><a href=\"#\" title=\"Created by: "+ value.CreatedAgent + "\" class=\"TableLink\" onclick=\"fn_SelectInvoice(" + value.Invoice + ");\">" + value.Invoice + "</a></td>";
+                NewRec += "<td style='text-align:center;'>" + value.Created + "</td>";
+                NewRec += "<td style='text-align:center;'><input type='hidden' id='Change_" + value.Invoice + "' value=" + value.StatusChange + " /><a id='Status_" + value.Invoice + "' href=\"#\" title=\"" + value.StatusDate + ' \n' + value.FulfilledAgent + "\" onclick=\"fn_StatusChange(" + value.Invoice + ");\">" + value.Status + "</a></td>";
+                NewRec += "<td style='text-align:center;'><input type='hidden' id=SM_" + value.Invoice + " value=" + value.shipping_account_delivery_method_id + " /><a id='Method_" + value.Invoice + "' href=\"#\" title='" + value.shipping_tracking_number + "' onclick='fn_DeliveryMethod(" + value.Invoice + ");' >" + value.shipping_account_delivery_method_desc + "</a></td>";
+                NewRec += "<td style='text-align:center;'><a href=\"#\" title=\"" + value.Name + "\">" + value.ShortName + "</a></td>";
+                NewRec += "<td><a href-\"#\" title=\"" + value.EventInfo + "\">" + value.Event + "</a></td>";
+                NewRec += "<td style='text-align:center;'>" + value.Date + "</td>";
+                NewRec += "<td style='text-align:center;'>" + value.Section + "</td>";
+                NewRec += "<td style='text-align:center;'>" + value.Row + "</td>";
+                NewRec += "<td style='text-align:right;'>" + value.Qty + "</td>";
+                NewRec += "<td style=\"text-align:right; \">" + formatCurrency(value.Cost); + "</td>";
+                NewRec += "<td style=\"text-align:right; \">" + formatCurrency(value.Price); + "</td>";
+                NewRec += "<td style=\"text-align:right; \">" + formatCurrency(value.Profit); + "</td>";
+                NewRec += "<td style=\"text-align:right; \">" + value.Margin + "%</td>";
+                NewRec += "<td style='text-align:right;'>" + formatCurrency(value.Paid); + "</td>";
+                NewRec += "<td style='text-align:center;'><a href='#' title=\"" + value.Notes + "\">" + value.External_PO + "</td>";
+                NewRec += "<td>" + value.EventDate2 + "</td>";
+                NewRec += "<td>" + value.Created2 + "</td></tr>";
+                $("#InvoiceTable > tbody").append(NewRec);
+            })
+            //$('#myPleaseWait').modal('hide');
+            fn_DisplayInvoiceList();
+        }
+        function fn_UpdateIL() {
+            var Status2 = $("#Status2").val();
+            var Start2 = $("#StartDate2").val();
+            var End2 = $("#EndDate2").val();
+            var Type2 = $("#Type2").val();
+            var URL = "../Invoice/UpdateValues";
+            $.ajax({
+                type: 'POST',
+                data: {
+                    Status: Status2,
+                    Start: Start2,
+                    End: End2,
+                    Type: Type2
+                },
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    vSearch = "Update";
+                    doSearch();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alert("Error: Updating Invoice List /" + thrownError);
+                }
+            });
+        }
+        function doSearch() {
+            var Search = $("#SearchBox2").val();
+            if (Search != vSearch) {
+                var Search = $("#SearchBox2").val();
+                vSearch = Search;
+                if (Search.length > 0)
+                {
+                    $("#Status2").val(0);
+                    $("#Type2").val("All");
+                }
+                //$('#myPleaseWait').modal('show');
+                setTimeout(function () {
+                    var URL = "../Invoice/Search";
+                    $.ajax({
+                        type: 'POST',
+                        data: {
+                            Search: Search
+                        },
+                        cache: false,
+                        aysnc: false,
+                        url: URL,
+                        success: function (result) {
+                            CurrentData = result;
+                            fn_DrawInvoices();
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            alert("Error: Searching Invoice List /" + thrownError);
+                        }
+                    });
+                }, 250);
+            }
+        }
+        $(document).ready(function () {
+            $(".NavBar").css("background-color", "");
+            $("#IV").css("background-color", "#353535");
+            if ($(window).width() > 1135) {
+                $("#IconBar2").show();
+                $("#wrapper").toggleClass("toggled");
+            } else
+                $("#IconBar").show();
+            $("#SearchWrapper2").show();
+            $("#LoginWrapper").show();
+            $("#StartDate").val('@ViewData["Start"]');
+            $("#EndDate").val('@ViewData["End"]');
+            table = $('#InvoiceTable').DataTable({
+                "destroy": true,
+                "ordering": true,
+                "scrollY": '75vh',
+                "scrollX": false,
+                "scrollCollapse": true,
+                "paging": false,
+                "searching": false,
+                "info": false,
+                "order": [[ 0, "desc" ]],
+                "columnDefs": [
+                    { targets: [13, 14], visible: false },
+                    { iDataSort: 13, targets: [6] },
+                    { iDataSort: 14, targets: [1] }
+                ],
+            });
+            doSearch();
+            window.onresize = function () {
+                table.columns.adjust().draw();
+            }
+        });
+    </script>
+}
+<div id="InvoiceTableDiv" style="width:100%; background-color:transparent; float:left; display:none">
+    <table id="InvoiceTable" class="table-condensed" style="border-radius:4px; background-color:#ffffff; box-shadow:0 2px 8px 0 rgba(53, 53, 53, 0.08);">
+        <thead>
+            <tr class="TableTr">
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Invoice</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Created</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Status</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Method</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Name</th>
+                <th style="text-align:center; border:none; border-bottom:solid black 1px;">Event</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Date</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Section</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Row</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Qty</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Cost</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Price</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Profit</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Margin</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Paid</th>
+                <th style="text-align:right; border:none; border-bottom:solid black 1px;">Buyer PO</th>
+                <th>EventDate2</th>
+                <th>CreatedDate2</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+            <tr style="border-radius: 4px; background-color: #1c81db; box-shadow: 0 -8px 8px 0 rgba(53, 53, 53, 0.08); box-shadow: 0 -8px 8px 0 var(--black-8);">
+                <th colspan="2" style="color:white;"></th>
+                <th colspan="2" ></th>
+                <th colspan="5"></th>
+                <th style="color:white; text-align:right;"></th>
+                <th style="color:white; text-align:right;"></th>
+                <th style="color:white; text-align:right;"></th>
+                <th style="color:white; text-align:right;"></th>
+                <th style="color:white; text-align:right;"></th>
+                <th style="color:white; text-align:right;"></th>
+                <th colspan="2"></th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<!-- Begin Modal -->
+<div class="modal loadingModal" id="ChangeSMDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px; width:400px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 id="SMTitle" class="-Info" style="color:white; float:left;">New&nbsp;Note</h1>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="$('#TR_' + InvoiceNumber).css('background-color', '');">Close</button>
+                </div>
+            </div>
+            <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:left;">
+                <label>Shipping Method&nbsp;</label>@Html.DropDownList("ShippingMethod", null, new { @id = "ShippingMethod", @class = "RoundedDropDown" })
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" style="background-color:#aec72d; color:#ffffff;" onclick="fn_ChangeMethod();">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal loadingModal" id="ChangeStatusDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
+    <div class="modal-dialog modal-sm" style="border-radius:4px; width:400px;">
+        <div class="modal-content" style="border-radius:6px;">
+            <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
+                <h1 id="CSTitle" class="-Info" style="color:white; float:left;"></h1>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal" style="background-color:#aec72d; color:#ffffff;" onclick="$('#TR_' + InvoiceNumber).css('background-color', '');">Close</button>
+                </div>
+            </div>
+            <div style="margin-left:10px; text-align:center;padding:5px; margin-top:15px; float:left;">
+                <label>Change Status to Shipment Pending?</label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" style="background-color:#aec72d; color:#ffffff;" onclick="fn_ChangeStatus();">YES</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- End Modal-->
