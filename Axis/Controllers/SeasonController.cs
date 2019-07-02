@@ -14,6 +14,12 @@ namespace Axis.Controllers
     {
         private AxisEntities db = new AxisEntities();
         // GET: Season
+        public ActionResult UpdateExclusion(Int32 Event_ID, Int32 Exchange_ID)
+        {
+            Int32 Login_ID = Convert.ToInt32(Session["Login_ID"]);
+            db.spUpdate_Exclusion(Login_ID, Event_ID, Exchange_ID);
+            return Content("success");
+        }
         public ActionResult AddPO()
         {
             Int32 NewPO_ID = 0;
@@ -26,10 +32,11 @@ namespace Axis.Controllers
             {
                 Int32 Vendor_ID = Convert.ToInt32(Request.Form["VendorID"]);
                 String PONotes = Request.Form["PONotes"];
+                String ExtPOID = Request.Form["ExtPOID"];
                 String Items = Request.Form["Items"];
                 String Payments = Request.Form["Payments"];
-                //List<spSTH_CreatePO_result> A = db.spSTH_CreatePO(Login_ID, Vendor_ID, PONotes, Items, Payments).ToList();
-                //NewPO_ID = A[0].PO_ID;
+                List<spSTH_CreatePO_Result> A = db.spSTH_CreatePO(Login_ID, Vendor_ID, PONotes, ExtPOID, Items, Payments).ToList();
+                NewPO_ID = Convert.ToInt32(A[0].PO_ID);
             }
             return Content(NewPO_ID.ToString());
         }
@@ -97,6 +104,11 @@ namespace Axis.Controllers
         {
             List<spGet_ShippingMethodSpecial_Result> SM = db.spGet_ShippingMethodSpecial().ToList();
             return Json(SM, JsonRequestBehavior.AllowGet);
+        }
+        public ActionResult GetAdditionalNotes()
+        {
+            List<spGet_AdditionalNotes_Result> AN = db.spGet_AdditionalNotes().ToList();
+            return Json(AN, JsonRequestBehavior.AllowGet);
         }
         public ActionResult CreatePO()
         {
@@ -193,18 +205,18 @@ namespace Axis.Controllers
                 List<spUser_GetLogin_Result> A = db.spUser_GetLogin(Login_ID).ToList();
                 ViewData["Name"] = A[0].FullName;
                 ViewData["Photo"] = @"/Images/" + A[0].Photo;
-                List<spGet_SeasonList_Result> model = db.spGet_SeasonList().ToList();
-                ViewData["ItemCount"] = model.Count().ToString() + " Item(s)";
-                ViewData["TotalQty"] = String.Format("{0:N0}", model.Sum(x => x.Qty));
-                ViewData["TicketQty"] = model[0].Qty;
-                ViewData["TotalCost"] = String.Format("{0:c}", model.Sum(x => x.TotalCost));
-                List<spSeason_History_Result> H = db.spSeason_History().ToList();
-                ViewData["SplitCount"] = H.Count().ToString() + " Item(s)";
-                ViewData["SplitQty"] = String.Format("{0:N0}", H.Sum(x => x.qty));
-                ViewData["SplitCost"] = String.Format("{0:c}", H.Sum(x => x.Cost));
-                ViewData["History"] = H;
-                return View(model);
+                 return View();
             }
+        }
+        public ActionResult PastSeason()
+        {
+            List<spSeason_History_Result> H = db.spSeason_History().ToList();
+            return Json(H, JsonRequestBehavior.AllowGet);
+        }
+        public ActionResult PendingSeason()
+        {
+            List<spGet_SeasonList_Result> model = db.spGet_SeasonList().ToList();
+            return Json(model, JsonRequestBehavior.AllowGet);
         }
         public ActionResult ClonePO(Int32 PO_ID, Int32 Season)
         {
@@ -539,36 +551,19 @@ namespace Axis.Controllers
             Session["STHHeadliner_ID"] = 0;
             return Content("success");
         }
-        public ActionResult JsonConvertItem(Int32 tg_id)
+        public ActionResult JsonConvertItem(Int32 tg_id, Boolean ShowAll)
         {
-            List<spGet_SeasonGames_Result> model = db.spGet_SeasonGames(tg_id).ToList();
+            Int32 Login_ID = Convert.ToInt32(Session["Login_ID"]);
+            List<spGet_SeasonSplitEvents_Result> model = db.spGet_SeasonSplitEvents(tg_id, ShowAll, Login_ID).ToList();
+            Int32 dirt = model.Count();
             return Json(model, JsonRequestBehavior.AllowGet);
         }
         public ActionResult SplitListing(Int32 Listing_ID)
         {
             Int32 Login_ID = Convert.ToInt32(Session["Login_ID"]);
             String Data = Request.Form["SplitString"];
-            List<spSplit_New_Result> A = db.spSplit_New(Listing_ID, Data, Login_ID).ToList();
-            if (A[0].ReturnCode == true)
-                return Content("success");
-            else
-                return Content("fail");
-        }
-        public ActionResult AddExchangeEvent(Int32 Ticket_Group_ID)
-        {
-            Int32 Login_ID = Convert.ToInt32(Session["Login_ID"]);
-            String Data = Request.Form["SplitString"];
-
-            List<spExchange_AddEvents_Result> A = db.spExchange_AddEvents(Ticket_Group_ID, Login_ID, Data).ToList();
-            if (A[0].ReturnCode == true)
-                return Content("success");
-            else
-                return Content("fail");
-        }
-        public ActionResult JsonMissingEvents(Int32 Ticket_Group_ID)
-        {
-            List<spGet_MissingEvents_Result> A = db.spGet_MissingEvents(Ticket_Group_ID).ToList();
-            return Json(A, JsonRequestBehavior.AllowGet);
+            List<spSplit_Season_Result> A = db.spSplit_Season(Listing_ID, Data, Login_ID).ToList();
+            return Content(A[0].ReturnCode);
         }
         public ActionResult STHSearch(String Input)
         {

@@ -134,7 +134,7 @@
         
         <div id="SearchWrapper4" style="height:100px; display:none; margin-left:50px; width:440px; float:left;">
             <div style="width:25px; margin-top:35px; display:block; float:left; ">
-                <div id="ClearSearch" style="display:none;" onclick="fn_ClearSearch();"><i class="material-icons">cancel</i></div>
+                <div id="ClearSearch4" style="display:none;" onclick="fn_ClearSearch();"><i class="material-icons">cancel</i></div>
             </div>
             <div id="SearchWrapper" class="SearchWrapper">
                 <input id="SearchBox4" class="SearchBox" placeholder="Search Seasons" onkeyup="doDelayedSearch(event)" autofocus />
@@ -321,6 +321,13 @@
                 <li class="NavBar" id="RE">
                     <a href="../Reference/Index"><i class="material-icons">pageview</i>Reference</a>
                 </li>
+                <li class="NavBar" id="OS">
+                    <a href="../Season/Index" id="navbarDropdownMenuLink" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="material-icons">alarm</i>OnSale</a>
+                    <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink" style="margin-left:25px;">
+                        <a class="dropdown-item" onclick="launchApplication('http://onsales.360Access.com', 'OnSales');" href="#"><i class="material-icons">alarm_add</i>OnSales</a>
+                        <a class="dropdown-item" onclick="launchApplication('https://datastudio.google.com/reporting/1d8100Jppk3TGkvDezdTagUeq6ssPPUXL/page/tgVq', 'Season Split');" href="#"><i class="material-icons">alarm_on</i>TOP TFS Sales</a>
+                    </div>
+                </li>
             </ul>
         </div>
         <!-- Page Content -->
@@ -331,7 +338,7 @@
         <div class="modal loadingModal bs-example-modal-sm" id="myPleaseWait" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static">
             <div class="modal-dialog modal-sm">
                 <div class="modal-content">
-                    <img src="~/Images/BBall.gif" width="300" height="150" >
+                    <img src="~/Images/Baseball.gif" width="300" height="175" >
                 </div>
             </div>
         </div>

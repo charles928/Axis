@@ -52,6 +52,12 @@
         var ZoneList = "";
         var QtyFilter = 0;
 
+        function fn_SelectInvoice(Invoice) {
+            var w = 860;
+            var h = 900;
+            var URL = "../Invoice/GetInvoice?Invoice_ID=" + Invoice + "&AutoPrint=false";
+            popupWindow(URL, Invoice, w, h);
+        }
         function fn_RecalcTotals()
         {
             var Quantity = 0;
@@ -1997,9 +2003,10 @@
                 "info": false,
                 "autowidth": false,
                 "columnDefs": [
-                    { targets: [7], orderable: false }
+                    { targets: [0], orderable: false },
+                     { targets: [2], iDataSort: 1 },
                 ],
-                "order": [[0, "asc"]]
+                "order": [[1, "asc"]]
             });
             var AutoPriceTable = $('#AutoPriceTable').DataTable({
                 "ordering": true,
@@ -2363,27 +2370,29 @@
                     <tr style="height:30px;">
                         <th></th>
                         <th style="padding-left:4px; border:none; border-bottom:solid black 1px;">Inv</th>
+                        <th style="border:none; border-bottom:solid black 1px;">Sale Date</th>
                         <th style="border:none; border-bottom:solid black 1px;">Name</th>
                         <th style="border:none; border-bottom:solid black 1px;">Sec</th>
                         <th style="border:none; border-bottom:solid black 1px;">Row</th>
                         <th style="border:none; border-bottom:solid black 1px; text-align:right; border:none; border-bottom:solid black 1px;">Qty</th>
-                        <th style="border:none; border-bottom:solid black 1px; text-align:right; background-color:#353535; color:white; ">Price</th>
-                        <th style="padding-right:4px; border:none; border-bottom:solid black 1px; text-align:right; background-color:#353535; color:white; ">Total</th>
+                        <th style="border:none; border-bottom:solid black 1px; text-align:center; background-color:#353535; color:white; ">Price</th>
+                        <th style="padding-right:4px; border:none; border-bottom:solid black 1px; text-align:center; background-color:#353535; color:white; ">Total</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var item in (List<spGet_PresalesForEvent2_Result>)ViewData["PresaleItems"])
                     {
-                        <tr class="TableTr" id="PSTR_@item.category_ticket_group_id">
-                            <td closs="PresalesTD" id="TD8_@item.category_ticket_group_id" style="padding-left:4px;border:none;"><input class="PresalesCheckBox" type="checkbox" id="CB_@item.category_ticket_group_id" onclick="fn_PresaleClick(@item.category_ticket_group_id);" /></td>
-                            <td class="PresalesTD" id="TD1_@item.category_ticket_group_id" style="text-align:left; padding-left:4px; border:none;">@Html.DisplayFor(modelitem => item.invoice_id)</td>
-                            <td class="PresalesTD" id="TD2_@item.category_ticket_group_id" style="border:none;"><a href="#" title="@item.Name2">@item.Name</a></td>
-                            <td class="PresalesTD" id="TD3_@item.category_ticket_group_id" style="border:none;">@Html.DisplayFor(modelitem => item.Section)</td>
-                            <td class="PresalesTD" id="TD4_@item.category_ticket_group_id" style="border:none;">@Html.DisplayFor(modelitem => item.Row)</td>
-                            <td class="PresalesTD" id="TD5_@item.category_ticket_group_id" style="text-align:center; border:none;">@Html.DisplayFor(modelitem => item.Qty)</td>
-                            <td  id="TD6_@item.category_ticket_group_id" style="text-align:right; border:none; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Price)</td>
-                            <td  id="TD7_@item.category_ticket_group_id" style="padding-right:4px; text-align:right; border:none; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Price * item.Qty)</td>
-                        </tr>
+                    <tr class="TableTr" id="PSTR_@item.category_ticket_group_id">
+                        <td class="PresalesTD" id="TD8_@item.category_ticket_group_id" style="padding-left:4px;border:none;"><input class="PresalesCheckBox" type="checkbox" id="CB_@item.category_ticket_group_id" onclick="fn_PresaleClick(@item.category_ticket_group_id);" /></td>
+                        <td class="PresalesTD" id="TD1_@item.category_ticket_group_id" style="text-align:left; padding-left:4px; border:none;"><a href="javascript:void(0)" onclick="fn_SelectInvoice(@item.invoice_id);">@item.invoice_id</a></td>
+                        <td class="PresalesTD" id="TD9_@item.category_ticket_group_id" style="text-align:left; padding-left:4px; border:none;">@Html.DisplayFor(modelitem => item.Invoice_Date)</td>
+                        <td class="PresalesTD" id="TD2_@item.category_ticket_group_id" style="border:none;"><a href="#" title="@item.Name2">@item.Name</a></td>
+                        <td class="PresalesTD" id="TD3_@item.category_ticket_group_id" style="border:none;">@Html.DisplayFor(modelitem => item.Section)</td>
+                        <td class="PresalesTD" id="TD4_@item.category_ticket_group_id" style="border:none;">@Html.DisplayFor(modelitem => item.Row)</td>
+                        <td class="PresalesTD" id="TD5_@item.category_ticket_group_id" style="text-align:center; border:none;">@Html.DisplayFor(modelitem => item.Qty)</td>
+                        <td id="TD6_@item.category_ticket_group_id" style="text-align:right; border:none; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Price)</td>
+                        <td id="TD7_@item.category_ticket_group_id" style="padding-right:4px; text-align:right; border:none; background-color:rgba(229,229,229, 0.48)">@String.Format("{0:c}", item.Price * item.Qty)</td>
+                    </tr>
                     }
                 </tbody>
                 <tfoot>

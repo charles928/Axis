@@ -1093,15 +1093,6 @@ namespace Axis
             return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction<spGet_SeasonList_Result>("spGet_SeasonList");
         }
     
-        public virtual ObjectResult<spGet_SeasonGames_Result> spGet_SeasonGames(Nullable<int> ticketGroup_ID)
-        {
-            var ticketGroup_IDParameter = ticketGroup_ID.HasValue ?
-                new ObjectParameter("TicketGroup_ID", ticketGroup_ID) :
-                new ObjectParameter("TicketGroup_ID", typeof(int));
-    
-            return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction<spGet_SeasonGames_Result>("spGet_SeasonGames", ticketGroup_IDParameter);
-        }
-    
         public virtual ObjectResult<spGet_MissingEvents_Result> spGet_MissingEvents(Nullable<int> ticket_Group_ID)
         {
             var ticket_Group_IDParameter = ticket_Group_ID.HasValue ?
@@ -2726,6 +2717,91 @@ namespace Axis
                 new ObjectParameter("Phone", typeof(string));
     
             return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction<spGet_VendorSearch_Result>("spGet_VendorSearch", sTHOnlyParameter, companyParameter, firstParameter, lastParameter, address1Parameter, address2Parameter, cityParameter, zipParameter, emailParameter, phoneParameter);
+        }
+    
+        public virtual ObjectResult<spGet_AdditionalNotes_Result> spGet_AdditionalNotes()
+        {
+            return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction<spGet_AdditionalNotes_Result>("spGet_AdditionalNotes");
+        }
+    
+        public virtual ObjectResult<spSTH_CreatePO_Result> spSTH_CreatePO(Nullable<int> login_ID, Nullable<int> vendor_ID, string pONotes, string extPOID, string items, string payments)
+        {
+            var login_IDParameter = login_ID.HasValue ?
+                new ObjectParameter("Login_ID", login_ID) :
+                new ObjectParameter("Login_ID", typeof(int));
+    
+            var vendor_IDParameter = vendor_ID.HasValue ?
+                new ObjectParameter("Vendor_ID", vendor_ID) :
+                new ObjectParameter("Vendor_ID", typeof(int));
+    
+            var pONotesParameter = pONotes != null ?
+                new ObjectParameter("PONotes", pONotes) :
+                new ObjectParameter("PONotes", typeof(string));
+    
+            var extPOIDParameter = extPOID != null ?
+                new ObjectParameter("ExtPOID", extPOID) :
+                new ObjectParameter("ExtPOID", typeof(string));
+    
+            var itemsParameter = items != null ?
+                new ObjectParameter("Items", items) :
+                new ObjectParameter("Items", typeof(string));
+    
+            var paymentsParameter = payments != null ?
+                new ObjectParameter("Payments", payments) :
+                new ObjectParameter("Payments", typeof(string));
+    
+            return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction<spSTH_CreatePO_Result>("spSTH_CreatePO", login_IDParameter, vendor_IDParameter, pONotesParameter, extPOIDParameter, itemsParameter, paymentsParameter);
+        }
+    
+        public virtual ObjectResult<spGet_SeasonSplitEvents_Result> spGet_SeasonSplitEvents(Nullable<int> ticketGroup_ID, Nullable<bool> showAll, Nullable<int> login_ID)
+        {
+            var ticketGroup_IDParameter = ticketGroup_ID.HasValue ?
+                new ObjectParameter("TicketGroup_ID", ticketGroup_ID) :
+                new ObjectParameter("TicketGroup_ID", typeof(int));
+    
+            var showAllParameter = showAll.HasValue ?
+                new ObjectParameter("ShowAll", showAll) :
+                new ObjectParameter("ShowAll", typeof(bool));
+    
+            var login_IDParameter = login_ID.HasValue ?
+                new ObjectParameter("Login_ID", login_ID) :
+                new ObjectParameter("Login_ID", typeof(int));
+    
+            return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction<spGet_SeasonSplitEvents_Result>("spGet_SeasonSplitEvents", ticketGroup_IDParameter, showAllParameter, login_IDParameter);
+        }
+    
+        public virtual int spUpdate_Exclusion(Nullable<int> login_ID, Nullable<int> event_ID, Nullable<int> exchange_ID)
+        {
+            var login_IDParameter = login_ID.HasValue ?
+                new ObjectParameter("Login_ID", login_ID) :
+                new ObjectParameter("Login_ID", typeof(int));
+    
+            var event_IDParameter = event_ID.HasValue ?
+                new ObjectParameter("Event_ID", event_ID) :
+                new ObjectParameter("Event_ID", typeof(int));
+    
+            var exchange_IDParameter = exchange_ID.HasValue ?
+                new ObjectParameter("Exchange_ID", exchange_ID) :
+                new ObjectParameter("Exchange_ID", typeof(int));
+    
+            return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction("spUpdate_Exclusion", login_IDParameter, event_IDParameter, exchange_IDParameter);
+        }
+    
+        public virtual ObjectResult<spSplit_Season_Result> spSplit_Season(Nullable<int> listing_ID, string data, Nullable<int> login_ID)
+        {
+            var listing_IDParameter = listing_ID.HasValue ?
+                new ObjectParameter("Listing_ID", listing_ID) :
+                new ObjectParameter("Listing_ID", typeof(int));
+    
+            var dataParameter = data != null ?
+                new ObjectParameter("Data", data) :
+                new ObjectParameter("Data", typeof(string));
+    
+            var login_IDParameter = login_ID.HasValue ?
+                new ObjectParameter("Login_ID", login_ID) :
+                new ObjectParameter("Login_ID", typeof(int));
+    
+            return ((IObjectContextAdapter)this).ObjectContext.ExecuteFunction<spSplit_Season_Result>("spSplit_Season", listing_IDParameter, dataParameter, login_IDParameter);
         }
     }
 }

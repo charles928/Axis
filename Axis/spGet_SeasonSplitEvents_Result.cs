@@ -11,18 +11,23 @@ namespace Axis
 {
     using System;
     
-    public partial class spGet_SeasonGames_Result
+    public partial class spGet_SeasonSplitEvents_Result
     {
+        public Nullable<long> ID { get; set; }
+        public Nullable<int> Login_ID { get; set; }
+        public Nullable<int> HiddenCount { get; set; }
+        public Nullable<bool> Hidden { get; set; }
+        public Nullable<int> exchange_id { get; set; }
         public Nullable<int> event_id { get; set; }
         public string event_name { get; set; }
+        public string Event_Date { get; set; }
+        public string Venue { get; set; }
+        public string State { get; set; }
+        public string Section { get; set; }
         public string Row { get; set; }
         public string Seats { get; set; }
         public Nullable<int> Qty { get; set; }
         public Nullable<decimal> TotalCost { get; set; }
-        public string Event_Date { get; set; }
-        public string Section { get; set; }
-        public string Venue { get; set; }
-        public Nullable<int> NextValue { get; set; }
-        public string State { get; set; }
+        public Nullable<long> NextValue { get; set; }
     }
 }

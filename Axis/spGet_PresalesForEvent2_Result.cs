@@ -23,5 +23,6 @@ namespace Axis
         public int category_ticket_group_id { get; set; }
         public string notes { get; set; }
         public string fullnotes { get; set; }
+        public string Invoice_Date { get; set; }
     }
 }

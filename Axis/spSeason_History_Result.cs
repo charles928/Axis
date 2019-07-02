@@ -24,8 +24,10 @@ namespace Axis
         public string Agent { get; set; }
         public Nullable<int> Events { get; set; }
         public Nullable<int> Tickets { get; set; }
-        public Nullable<System.DateTime> create_date { get; set; }
+        public string create_date { get; set; }
         public Nullable<decimal> Cost { get; set; }
-        public System.DateTime Split { get; set; }
+        public string Split { get; set; }
+        public System.DateTime Split_Sort { get; set; }
+        public Nullable<System.DateTime> create_date_sort { get; set; }
     }
 }

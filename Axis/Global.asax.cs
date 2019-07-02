@@ -14,7 +14,9 @@ namespace Axis
             //this is just to verify copy
             if (!Request.IsSecureConnection)
             {
-                //Response.Redirect(Request.Url.ToString().Replace("http://", "https://"));
+                #if !DEBUG
+                    Response.Redirect(Request.Url.ToString().Replace("http://", "https://"));
+                #endif
             }
         }
          protected void Application_Start()

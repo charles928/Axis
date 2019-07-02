@@ -16,14 +16,16 @@ namespace Axis
         public int purchase_order_id { get; set; }
         public string client_broker_company_name { get; set; }
         public string event_name { get; set; }
-        public System.DateTime event_datetime { get; set; }
+        public string event_datetime { get; set; }
         public string section { get; set; }
         public string row { get; set; }
         public string Seats { get; set; }
         public Nullable<int> Qty { get; set; }
         public string system_user_username { get; set; }
-        public Nullable<System.DateTime> create_date { get; set; }
+        public string create_date { get; set; }
         public Nullable<decimal> TotalCost { get; set; }
         public Nullable<int> ticket_group_id { get; set; }
+        public Nullable<System.DateTime> create_date_sort { get; set; }
+        public System.DateTime event_datetime_sort { get; set; }
     }
 }

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28922.388
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axis", "Axis\Axis.csproj", "{90ABFCFC-86A1-4DC5-9788-94DDF674CF6C}"
 EndProject
@@ -19,11 +19,7 @@ Global
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
-	GlobalSection(SourceCodeControl) = preSolution
-		SccNumberOfProjects = 2
-		SccLocalPath0 = .
-		SccProjectUniqueName1 = Axis\\Axis.csproj
-		SccLocalPath1 = .
-		SccProjectFilePathRelativizedFromConnection1 = Axis\\
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C0138C2D-82E3-4FB4-9C2E-F11EF7753015}
 	EndGlobalSection
 EndGlobal

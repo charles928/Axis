@@ -26,11 +26,16 @@
     <UseGlobalApplicationHostFile />
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
-    <SccProjectName>SAK</SccProjectName>
-    <SccLocalPath>SAK</SccLocalPath>
-    <SccAuxPath>SAK</SccAuxPath>
-    <SccProvider>SAK</SccProvider>
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
     <TypeScriptToolsVersion>1.8</TypeScriptToolsVersion>
+    <Use64BitIISExpress />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -280,6 +285,9 @@
     <Compile Include="spGet_Activity_Result.cs">
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>
+    <Compile Include="spGet_AdditionalNotes_Result.cs">
+      <DependentUpon>Model1.tt</DependentUpon>
+    </Compile>
     <Compile Include="spGet_AdvancedSearch_Result.cs">
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>
@@ -457,10 +465,10 @@
     <Compile Include="spGet_Search_Result.cs">
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>
-    <Compile Include="spGet_SeasonGames_Result.cs">
+    <Compile Include="spGet_SeasonList_Result.cs">
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>
-    <Compile Include="spGet_SeasonList_Result.cs">
+    <Compile Include="spGet_SeasonSplitEvents_Result.cs">
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>
     <Compile Include="spGet_SHCredintials_Result.cs">
@@ -553,6 +561,9 @@
     <Compile Include="spSplit_New_Result.cs">
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>
+    <Compile Include="spSplit_Season_Result.cs">
+      <DependentUpon>Model1.tt</DependentUpon>
+    </Compile>
     <Compile Include="spSTH_AddNotice_Result.cs">
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>
@@ -563,6 +574,9 @@
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>
     <Compile Include="spSTH_Clone_Result.cs">
+      <DependentUpon>Model1.tt</DependentUpon>
+    </Compile>
+    <Compile Include="spSTH_CreatePO_Result.cs">
       <DependentUpon>Model1.tt</DependentUpon>
     </Compile>
     <Compile Include="spSTH_DeleteRequest_Result.cs">
@@ -872,6 +886,9 @@
     <Content Include="Images\Add.png" />
     <Content Include="Images\animated_loading.gif" />
     <Content Include="Images\axis-logo.jpg" />
+    <Content Include="Images\baseball.gif">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Images\BBall.gif" />
     <Content Include="Images\Charles.PNG" />
     <Content Include="Images\Chris.png" />
@@ -893,7 +910,6 @@
     <Content Include="Images\Ryan.jpg" />
     <Content Include="Images\SmallArrorDown.png" />
     <Content Include="Images\stubhub.png" />
-    <Content Include="Images\Trey.jpg" />
     <Content Include="Images\White-LightBlue-BG.png" />
     <Content Include="Images\wind.png" />
     <Content Include="Images\zach.png" />
@@ -951,6 +967,7 @@
     <Content Include="Scripts\bootstrap.js.map" />
     <Content Include="Scripts\bootstrap.bundle.min.js.map" />
     <Content Include="Scripts\bootstrap.bundle.js.map" />
+    <Content Include="Connected Services\Application Insights\ConnectedService.json" />
     <None Include="Properties\PublishProfiles\PushAxis.pubxml" />
     <None Include="Properties\PublishProfiles\WebDeploy to TT.pubxml" />
     <None Include="Scripts\jquery-3.3.1.intellisense.js" />
@@ -1212,6 +1229,9 @@
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="Scripts\index.d.ts" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

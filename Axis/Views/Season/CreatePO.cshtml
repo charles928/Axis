@@ -10,6 +10,7 @@
     var SRTable;
     var StockType = '';
     var ShippingMethod = '';
+    var AdditionalNotes = '';
     var Vendor_ID = 0;
     var Buyer_ID = 1;
     $.ajax({
@@ -36,7 +37,41 @@
             alert("Error: Getting Shipping Method /" + thrownError);
         }
     });
+    $.ajax({
+        type: 'GET',
+        url: "GetAdditionalNotes",
+        success: function (result) {
+            jQuery.each(result, function (index, value) {
+                AdditionalNotes += "<option id=" + value.ID + ">" + value.Desc + "</option>";
+            });
+        },
+        error: function (xhr, ajaxOptions, thrownError) {
+            alert("Error: Getting Additional Notes /" + thrownError);
+        }
+    });
 
+    function fn_GetStateList(Country_ID, Source) {
+            $('#myPleaseWait').modal('show');
+            var URL = "../Sales/GetStateList?Country_ID=" + Country_ID;
+            $.ajax({
+                type: 'GET',
+                cache: false,
+                aysnc: false,
+                url: URL,
+                success: function (result) {
+                    $("#" + Source).children().remove();
+                    jQuery.each(result, function (index, item) {
+                        var NewState = '<option value=' + item.state_id + '>' + item.state_name + '</option>';
+                        $("#" + Source).append(NewState);
+                    });
+                    $('#myPleaseWait').modal('hide');
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    $('#myPleaseWait').modal('hide');
+                    alert("Error: Updating State List /" + thrownError);
+                }
+            });
+    }
     function fn_CompletePurchase() {
         var Retval = false;
         if (Vendor_ID == 0) //Blank or new Vendor
@@ -126,10 +161,38 @@
                 var Cost = $("#Cost_" + TR_ID[1]).val().replace("$", "").replace(",", "");
                 var Price = $("#Price_" + TR_ID[1]).val().replace("$", "").replace(",", "");
                 var Stock = $("#ST_" + TR_ID[1]).find('option:selected').attr('id');
-                var Shipping = $("#SM_" + TR_ID[1]).find('option:selected').attr('id');
+                if (Stock == 1) {
+                    var SAT = 1;
+                    var SADM = 7;
+                    var SMS = 0;
+                    var SNTO = 0;
+                }
+                if (Stock == 2) {
+                    var SAT = 4;
+                    var SADM = 22;
+                    var SMS = $("#SM_" + TR_ID[1]).find('option:selected').attr('id');
+                    if (SMS == 1)
+                        var SNTO = 0;
+                    else
+                        var SNTO = 14;
+                }
+                if (Stock == 5) {
+                    var SAT = 4;
+                    var SADM = 33;
+                    var SMS = 15;
+                    var SNTO = 2;
+                }
+                if (Stock == 7) {
+                    var SAT = 4;
+                    var SADM = 31;
+                    var SMS = 13;
+                    var SNTO = 2;
+                }
+                
+                var AddNotes = $("#AN_" + TR_ID[1]).find('option:selected').attr('id');
                 var Notes = $("#Notes_" + TR_ID[1]).val();
                 var Inhand = $("#IH_" + TR_ID[1]).is(":checked");
-                Items += "~" + Exchange_ID + '|' + SSF + '|' + Qty + '|' + Sec + '|' + Row + '|' + Min + '|' + Donation + '|' + Cost + '|' + Price + '|' + Stock + '|' + Shipping + '|' + Notes + '|' + Inhand;
+                Items += "~" + Exchange_ID + '|' + SSF + '|' + Qty + '|' + Sec + '|' + Row + '|' + Min + '|' + Donation + '|' + Cost + '|' + Price + '|' + Stock + '|' + SAT + '|' + SADM + '|' + SMS + '|' + SNTO + '|' + AddNotes + '|' + Notes + '|' + Inhand;
             });
 
             var Payments = "";
@@ -150,12 +213,21 @@
                 data: {
                     VendorID: Vendor_ID,
                     PONotes: $("#InvoiceNotes").val(),
+                    ExtPOID: $("#ExtPOID").val(),
                     Items: Items,
                     Payments: Payments
                 },
                 success: function (result) {
+                    alert('PO #' + result + ' Created!');
                     PO_ID = result;
-                },
+                    var w = 860;
+                    var h = 900;
+                    var URL = "../Purchase/GetPO?PO_ID=" + PO_ID;
+                    popupWindow(URL, "PO", w, h);
+                    setTimeout(function () {
+                        location.reload();                
+                    }, 250);
+                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     alert("Error: Adding PO /" + thrownError);
                 }
@@ -248,18 +320,29 @@
                     });
                     NewID = parseInt(NewID) + 1;
 
-                    var NewRec = "<tr id=\"PayTR_" + NewID + "\"><td style=\"padding:0;\">" +
-                               "<input type=\"hidden\" id=\"PayTypeID_" + NewID + "\" value=" + PayTypeID + " />" +
-                               "<input type=\"hidden\" id=\"CCID_" + NewID + "\" value=0 />" + PayType + "</td>" +
-                               "<td style=\"padding:0; text-align:center;\"><input id=\"PayNote_" + NewID + "\" style=\"width:100%\" onclick=\"this.select();\" /></td>" +
-                               "<td id=\"PayAmt_" + NewID + "\" style=\"padding:0; text-align:right; width:40px;\">" + formatCurrency(PayAmt) + "</td>" +
-                               "<td style=\"padding:0; text-aligh:center; max-width:23px;\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_DeletePayment();\">clear</i></tr>";
+                    var NewRec;
+                    if (PayTypeID == 13) {
+                        NewRec = "<tr id=\"PayTR_" + NewID + "\"><td style=\"padding:0;\">" +
+                            "<input type=\"hidden\" id=\"PayTypeID_" + NewID + "\" value=" + PayTypeID + " />" +
+                            "<input type=\"hidden\" id=\"CCID_" + NewID + "\" value=0 />" + PayType + "</td>" +
+                            "<td style=\"padding:0; text-align:center;\"><input type='Number' placeholder='Check Number' id=\"PayNote_" + NewID + "\" autocomplete=\"nope\" style=\"width:100%\" onclick=\"this.select();\" value='0' /></td>" +
+                            "<td id=\"PayAmt_" + NewID + "\" style=\"padding:0; text-align:right; width:40px;\">" + formatCurrency(PayAmt) + "</td>" +
+                            "<td style=\"padding:0; text-aligh:center; max-width:23px;\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_DeletePayment();\">clear</i></tr>";
+           
+                    } else
+                        NewRec = "<tr id=\"PayTR_" + NewID + "\"><td style=\"padding:0;\">" +
+                            "<input type=\"hidden\" id=\"PayTypeID_" + NewID + "\" value=" + PayTypeID + " />" +
+                            "<input type=\"hidden\" id=\"CCID_" + NewID + "\" value=0 />" + PayType + "</td>" +
+                            "<td style=\"padding:0; text-align:center;\"><input id=\"PayNote_" + NewID + "\" style=\"width:100%\" autocomplete=\"nope\" onclick=\"this.select();\" /></td>" +
+                            "<td id=\"PayAmt_" + NewID + "\" style=\"padding:0; text-align:right; width:40px;\">" + formatCurrency(PayAmt) + "</td>" +
+                            "<td style=\"padding:0; text-aligh:center; max-width:23px;\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_DeletePayment();\">clear</i></tr>";
 
                     $("#PayTable > tbody").append(NewRec);
                     fn_TotalPO();
                     $("#PayTypeList").val(1);
                     setTimeout(function () {
                         $("#PayNote_" + NewID).focus();
+                        $("#PayNote_" + NewID).select();
                     }, 250);
                 }
             }
@@ -416,18 +499,6 @@
                 Max = parseInt(Min) + (parseInt(Qty) * 2) - 2;
         }
         $("#Max_" + ID[1]).text(Max);
-        if (ID[0] == "SSF") {
-            $("#Qty_" + ID[1]).focus();
-            $("#Qty_" + ID[1]).select();
-        }
-        if (ID[0] == "Qty") {
-            $("#Sec_" + ID[1]).focus();
-            $("#Sec_" + ID[1]).select();
-        }
-        if (ID[0] == "Min") {
-            $("#Don_" + ID[1]).focus();
-            $("#Don_" + ID[1]).select();
-        }
     }
     function fn_DelRow(ID) {
         $("#TR_" + ID).remove();
@@ -435,6 +506,28 @@
     }
     function fn_AddRow(Exchange_ID) {
         fn_SelectEvent(Exchange_ID);
+    }
+    function fn_ChangeStockType(NewID) {
+        var NewST = $("#ST_" + NewID).val();
+        if (NewST == "Standard") {
+            $("#SM_" + NewID).hide();
+            $("#SMText_" + NewID).show();
+            $("#SMText_" + NewID).val('Near Term Special Delivery');
+        }
+        if (NewST == "e-Ticket") {
+            $("#SMText_" + NewID).hide();
+            $("#SM_" + NewID).show();
+        }
+        if (NewST == "Flash Seats") {
+            $("#SM_" + NewID).hide();
+            $("#SMText_" + NewID).show();
+            $("#SMText_" + NewID).val('Flash Transfer');
+        }
+        if (NewST == "Mobile") {
+            $("#SM_" + NewID).hide();
+            $("#SMText_" + NewID).show();
+            $("#SMText_" + NewID).val('Direct Transfer');
+        }
     }
     function fn_SelectEvent(Exchange_ID) {
         var URL = "STHEventInfo?Exchange_ID=" + Exchange_ID;
@@ -456,24 +549,27 @@
 
                 jQuery.each(result, function (index, value) {
                     var NewRec = "<tr id=\"TR_" + NewID + "\" class=\"TRClass\">" +
-                        "<td style=\"padding:0; max-width:23px; text-align:center;\" title=\"Create a new copy of this line item.\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_AddRow(" + Exchange_ID + ");\">add</i></td>" +
-                        "<td style=\"padding:0; text-align:left; background-color:RGBA(211,211,211,.4);\"><input type=\"hidden\" id=\"ExchangeID_" + NewID + "\" value=" + Exchange_ID + " />" + value.Event + "</td>" +
-                        "<td style=\"padding:0; text-align:left; background-color:RGBA(211,211,211,.4);\">" + value.EventDate + "</td>" +
-                        "<td style=\"padding:0; text-align:left;\ background-color:RGBA(211,211,211,.4);\">" + value.Venue + "</td>" +
-                        "<td style=\"padding:0;\"><a href='#' id=\"SSF_" + NewID + "\" style=\"padding-left:5px; padding-right:5px;\" onclick=\"fn_ClickSSF(" + NewID + ");\" >Seq</a></td>" +
-                        "<td style=\"padding:0;\"><input id=\"Qty_" + NewID + "\" style=\"max-width:40px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangeSeats(this.id);\" value=0 /></td>" +
-                        "<td style=\"padding:0;\"><input id=\"Sec_" + NewID + "\" style=\"max-width:80px;\" onclick=\"this.select();\" /></td>" +
-                        "<td style=\"padding:0;\"><input id=\"Row_" + NewID + "\" style=\"max-width:60px;\" onclick=\"this.select();\" /></td>" +
-                        "<td style=\"padding:0;\"><input id=\"Min_" + NewID + "\" style=\"max-width:40px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangeSeats(this.id);\" value=0 /></td>" +
-                        "<td style=\"padding:0; text-align:right; width:40px; background-color:RGBA(211,211,211,.4); \" id=\"Max_" + NewID + "\" >0</td>" +
-                        "<td style=\"padding:0;\"><input id=\"Don_" + NewID + "\" style=\"max-width:80px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangePrice(this.id);\" value='$0.00' /></td>" +
-                        "<td style=\"padding:0;\"><input id=\"Cost_" + NewID + "\" style=\"max-width:80px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangePrice(this.id);\" value='$0.00' /></td>" +
-                        "<td style=\"padding:0;\"><input id=\"Price_" + NewID + "\" style=\"max-width:80px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangePrice(this.id);\" value='$0.00' /></td>" +
-                        "<td><select id=\"ST_" + NewID + "\" style=\"max-width:70px;\" >" + StockType + "</select></td>" +
-                        "<td><select id=\"SM_" + NewID + "\" style=\"max-width:70px;\" >" + ShippingMethod + "</select></td>" +
-                        "<td style=\"padding:0;\"><input id=\"Notes_" + NewID + "\" onclick=\"this.select();\" /></td>" +
-                        "<td style=\"padding:0; text-align:center;\"><input type=\"checkbox\" id=\"IH_" + NewID + "\" /></td>" +
-                        "<td style=\"padding:0; max-width:23px; text-align:center;\" title=\"Remove this line item.\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_DelRow(" + NewID + ");\">clear</i></td></tr>"
+                        "<td style=\"max-width:23px; text-align:center;\" title=\"Create a new copy of this line item.\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_AddRow(" + Exchange_ID + ");\">add</i></td>" +
+                        "<td style=\"text-align:left; background-color:RGBA(211,211,211,.4);\"><input type=\"hidden\" id=\"ExchangeID_" + NewID + "\" value=" + Exchange_ID + " />" + value.Event + "</td>" +
+                        "<td style=\"text-align:left; background-color:RGBA(211,211,211,.4);\">" + value.EventDate + "</td>" +
+                        "<td style=\"text-align:left;\ background-color:RGBA(211,211,211,.4);\">" + value.Venue + "</td>" +
+                        "<td style=\"text-align:center;\"><a href='#' id=\"SSF_" + NewID + "\" style=\"padding-left:5px; padding-right:5px;\" onclick=\"fn_ClickSSF(" + NewID + ");\" >Seq</a></td>" +
+                        "<td style=\"text-align:center;\"><input id=\"Qty_" + NewID + "\" style=\"max-width:40px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangeSeats(this.id);\" value=0 /></td>" +
+                        "<td style=\"text-align:center;\"><input id=\"Sec_" + NewID + "\" style=\"max-width:80px;\" onclick=\"this.select();\" /></td>" +
+                        "<td style=\"text-align:center;\"><input id=\"Row_" + NewID + "\" style=\"max-width:60px;\" onclick=\"this.select();\" /></td>" +
+                        "<td style=\"text-align:center;\"><input id=\"Min_" + NewID + "\" style=\"max-width:40px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangeSeats(this.id);\" value=0 /></td>" +
+                        "<td style=\"text-align:center; text-align:right; width:40px; background-color:RGBA(211,211,211,.4); \" id=\"Max_" + NewID + "\" >0</td>" +
+                        "<td style=\"text-align:center;\"><input id=\"Don_" + NewID + "\" style=\"max-width:80px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangePrice(this.id);\" value='$0.00' /></td>" +
+                        "<td style=\"text-align:center;\"><input id=\"Cost_" + NewID + "\" style=\"max-width:80px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangePrice(this.id);\" value='$0.00' /></td>" +
+                        "<td style=\"text-align:center;\"><input id=\"Price_" + NewID + "\" style=\"max-width:80px; text-align:right;\" onclick=\"this.select();\" onchange=\"fn_ChangePrice(this.id);\" value='$0.00' /></td>" +
+                        "<td style=\"text-align:center;\"><select id=\"ST_" + NewID + "\" style=\"max-width:70px;\" onchange=\"fn_ChangeStockType(" + NewID + ");\" >" + StockType + "</select></td>" +
+                        "<td id=\"SMTD_" + NewID + " style=\"text-align:center; \">" +
+                        "<input id=\"SMText_" + NewID + "\" style=\"max-width:120px;\" readonly=\"readonly\" value=\"Near Term Special Delivery\" />" +
+                        "<select id=\"SM_" + NewID + "\" style=\"display:none; max-width:120px;\" >" + ShippingMethod + "</select></td>" +
+                        "<td style=\"text-align:center;\"><select id=\"AN_" + NewID + "\" style=\"max-width:70px;\" >" + AdditionalNotes + "</select></td>" +
+                        "<td style=\"text-align:center;\"><input id=\"Notes_" + NewID + "\" onclick=\"this.select();\" /></td>" +
+                        "<td style=\"text-align:center;\"><input type=\"checkbox\" id=\"IH_" + NewID + "\" /></td>" +
+                        "<td style=\"text-align:center; max-width:23px; \" title=\"Remove this line item.\"><i class=\"material-icons\" style=\"color:#adc72e;\" onclick=\"fn_DelRow(" + NewID + ");\">clear</i></td></tr>"
 
                     $("#CartTable > tbody").append(NewRec);
                 });
@@ -682,9 +778,24 @@
         }
     }
 
-    $(document).keyup(function (e) {
-        if ($("#AdvSearchBox").is(":focus") && (e.keyCode == 13)) {
-            fn_Continue();
+    $(document).keypress(function (e) {
+        if (e.keyCode == 13) {
+            if ($("#AdvSearchBox").is(":focus")) {
+                fn_Continue();
+            } else {
+                var WhereAmI = $(e.target).attr("id").split("_");
+                if (WhereAmI[0].substring(0,1) == 'V')
+                    fn_VendorSearch();
+                else {
+                    if (parseInt(WhereAmI[1]) > 0) {
+                        if ($("#Qty_" + (parseInt(WhereAmI[1]) + 1)).width() == null) {
+                            $("#Qty_1").focus();
+                        } else {
+                            $("#Qty_" + (parseInt(WhereAmI[1]) + 1)).focus();
+                        }
+                    }
+                }
+            }
         }
     });
 
@@ -712,6 +823,50 @@
             "info": false,
             "autowidth": false,
         });
+        $("#VCountry").val(217);
+
+        $('#VPhone').keyup(function(e){
+            var ph = this.value.replace(/\D/g,'').substring(0,10);
+            // Backspace and Delete keys
+            var deleteKey = (e.keyCode == 8 || e.keyCode == 46);
+            var len = ph.length;
+            if(len==0){
+                ph=ph;
+            }else if(len<3){
+                ph='('+ph;
+            }else if(len==3){
+                ph = '('+ph + (deleteKey ? '' : ') ');
+            }else if(len<6){
+                ph='('+ph.substring(0,3)+') '+ph.substring(3,6);
+            }else if(len==6){
+                ph='('+ph.substring(0,3)+') '+ph.substring(3,6)+ (deleteKey ? '' : '-');
+            }else{
+                ph='('+ph.substring(0,3)+') '+ph.substring(3,6)+'-'+ph.substring(6,10);
+            }
+            this.value = ph;
+        });
+        $('#STPhone').keyup(function(e){
+            var ph = this.value.replace(/\D/g,'').substring(0,10);
+            // Backspace and Delete keys
+            var deleteKey = (e.keyCode == 8 || e.keyCode == 46);
+            var len = ph.length;
+            if(len==0){
+                ph=ph;
+            }else if(len<3){
+                ph='('+ph;
+            }else if(len==3){
+                ph = '('+ph + (deleteKey ? '' : ') ');
+            }else if(len<6){
+                ph='('+ph.substring(0,3)+') '+ph.substring(3,6);
+            }else if(len==6){
+                ph='('+ph.substring(0,3)+') '+ph.substring(3,6)+ (deleteKey ? '' : '-');
+            }else{
+                ph='('+ph.substring(0,3)+') '+ph.substring(3,6)+'-'+ph.substring(6,10);
+            }
+            this.value = ph;
+        });
+
+
         $("#SearchBox").focus();
 
     });
@@ -745,11 +900,11 @@
                 <label style="margin:5px; float:left; font-weight:bold;">Zip</label><input autocomplete="nope" class="InputOption" id="VZip" maxlength="25" style="width:50px; float:left;" />
             </div>
             <div style="width:100%; float:left;">
-                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Country</label><div style="float:left;">@Html.DropDownList("CountryList", null, new { @class = "InputOption RoundedDropDown", @id = "VCountry", @style = "margin-left:6px; height:22px; width:267px;", @onchange = "fn_GetStateList(this.value, 'BTState');" })</div>
+                <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Country</label><div style="float:left;">@Html.DropDownList("CountryList", null, new { @class = "InputOption RoundedDropDown", @id = "VCountry", @style = "margin-left:6px; height:22px; width:267px;", @onchange = "fn_GetStateList(this.value, 'VState');" })</div>
             </div>
             <div style="width:100%; float:left;">
                 <label style="margin:5px; width:60px; text-align:right; float:left; font-weight:bold;">Email</label><input autocomplete="nope" class="InputOption" id="VEmail" maxlength="500" style="margin-left:6px; width:123px; float:left;" />
-                <label style="margin:5px; float:left; font-weight:bold;">Phone</label><input autocomplete="nope" class="InputOption" id="VPhone" maxlength="100" style="width:100px; float:left;" />
+                <label style="margin:5px; float:left; font-weight:bold;">Phone</label><input type="tel" autocomplete="nope" class="InputOption" id="VPhone" maxlength="100" style="width:100px; float:left;" />
             </div>
         </div>
         <div style="display:block; width:360px; margin:10px; margin-right:50px; padding:5px; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75); float:right;">
@@ -790,22 +945,23 @@
         <thead>
             <tr style="height:30px;">
                 <th></th>
-                <th>Event</th>
-                <th>Date</th>
-                <th>Venue</th>
-                <th>SSF</th>
-                <th style="max-width:40px;">Qty</th>
-                <th>Sec</th>
-                <th>Row</th>
-                <th style="max-width:40px;">Min</th>
-                <th style="max-width:40px;">Max</th>
-                <th style="max-width:80px;">Donation</th>
-                <th style="max-width:80px;">Cost</th>
-                <th style="max-width:80px;">Price</th>
-                <th>Stock</th>
-                <th>Shipping</th>
-                <th>Notes</th>
-                <th>Inhand</th>
+                <th style="text-align:center;">Event</th>
+                <th style="text-align:center;">Date</th>
+                <th style="text-align:center;">Venue</th>
+                <th style="text-align:center;">SSF</th>
+                <th style="text-align:center; max-width:40px;">Qty</th>
+                <th style="text-align:center;">Sec</th>
+                <th style="text-align:center;">Row</th>
+                <th style="text-align:center; max-width:40px;">Min</th>
+                <th style="text-align:center; max-width:40px;">Max</th>
+                <th style="text-align:center; max-width:80px;">Don (total)</th>
+                <th style="text-align:center; max-width:80px;">Cost (total)</th>
+                <th style="text-align:center; max-width:80px;">Price (each)</th>
+                <th style="text-align:center;">Stock</th>
+                <th style="text-align:center;">Shipping</th>
+                <th style="text-align:center;">Add Notes</th>
+                <th style="text-align:center;">Int Notes</th>
+                <th style="text-align:center;">Inhand</th>
                 <th></th>
             </tr>
         </thead>
@@ -814,45 +970,52 @@
 </div>
 
 <div id="Bottom" style="display:flex; width:100%; margin:20px; justify-content:space-around; float:left;">
-        <div id="BottomLeft" style="display:inline-block; width:155px; height:140px; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
-            <label style="margin:5px; font-weight:bold; float:left;">PO Notes:</label>
-            <textarea class="InputOption" id="InvoiceNotes" style="margin-left:5px; float:left; clear:both; height:80%; width:93%;"></textarea>
+    <div id="BottomNew" style="display:inline-block; width:165px;">
+        <div  style="display:inline-block; width:165px; height:35px; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+            <label for="ExtPOID" style="margin:5px; margin-top:11px; font-weight:bold; float:left;">External PO#:</label>
+            <input class="InputOption" id="ExtPOID" style="width:75px; margin-top:8px; float:left;" onclick="this.select();">
         </div>
-        <div id="BottomCenter" style="display:inline-block; width:440px;">
-            <div style="float:left; width:100%; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
-                <label style="margin:5px; margin-top:10px; font-weight:bold; float:left;">New Payment:</label>
-                <div style="float:left; margin:5px;">@Html.DropDownList("PayTypeList", null, new { @class = "RoundedDropDown" })</div>
-                <label style="margin:5px; margin-top:10px; font-weight:bold; float:left;">Amount:</label>
-                <input id="PayAmt" style="margin-top:8px; text-align:right; width:75px; float:left;" onclick="this.select();" value="$0.00" onchange="fn_UpdatePayAmt();" />
-                <button style="font-size:10pt; margin-top:6px; background-color:#adc72e; float:right; margin-right:5px;" onclick="fn_AddPayment();">Add</button>
-            </div>
-            <div style="float:left; width:100%; height:100px; margin-top:20px; background-color:transparent;">
-                <table id="PayTable" class="table-bordered" style="border-radius:4px; background-color:#ffffff; width:100%; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Note</th>
-                            <th style="text-align:right; max-width:75px;">Amount</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+    </div>
+    <div id="BottomLeft" style="display:inline-block; width:155px; height:140px; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+        <label style="margin:5px; font-weight:bold; float:left;">PO Notes:</label>
+        <textarea class="InputOption" id="InvoiceNotes" style="margin-left:5px; float:left; clear:both; height:80%; width:93%;"></textarea>
+    </div>
+    <div id="BottomCenter" style="display:inline-block; width:440px;">
+        <div style="float:left; width:100%; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+            <label style="margin:5px; margin-top:10px; font-weight:bold; float:left;">New Payment:</label>
+            <div style="float:left; margin:5px;">@Html.DropDownList("PayTypeList", null, new { @class = "RoundedDropDown" })</div>
+            <label style="margin:5px; margin-top:10px; font-weight:bold; float:left;">Amount:</label>
+            <input id="PayAmt" style="margin-top:8px; text-align:right; width:75px; float:left;" onclick="this.select();" value="$0.00" onchange="fn_UpdatePayAmt();" />
+            <button style="font-size:10pt; margin-top:6px; background-color:#adc72e; float:right; margin-right:5px;" onclick="fn_AddPayment();">Add</button>
         </div>
-        <div id="BottomRight" style="display:inline-block;">
-            <div id="TotalDiv" style="float:right; display:block; margin-right:30px; padding:10px; font-weight:bold; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
-                <div id="DonDiv" style="clear:both; float:right;">Donation Total&nbsp;<input id="DonTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
-                <div id="CostDiv" style="clear:both; float:right;">Cost Total&nbsp;<input id="CostTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
-                <div id="TotalDiv" style="clear:both; float:right;">Order Total&nbsp;<input id="CartTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
-                <div id="PaymentDiv" style="clear:both; float:right;">Payment(s)&nbsp;<input id="CartPayTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
-                <div id="BalanceDiv" style="clear:both; float:right;">Balance&nbsp;<input id="CartBalance" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
-                <div id="CreateDiv" style="clear:both; float:left; width:100%; text-align:center; display:none;">
-                    <button style="font-size:10pt; margin-top:6px; background-color:#adc72e;" onclick="fn_CompletePurchase();">Create PO</button>
-                </div>
+        <div style="float:left; width:100%; height:100px; margin-top:20px; background-color:transparent;">
+            <table id="PayTable" class="table-bordered" style="border-radius:4px; background-color:#ffffff; width:100%; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Note</th>
+                        <th style="text-align:right; max-width:75px;">Amount</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="BottomRight" style="display:inline-block;">
+        <div id="TotalDiv" style="float:right; display:block; margin-right:30px; padding:10px; font-weight:bold; border-radius:4px; background-color:#ffffff; box-shadow:10px 10px 5px 0px rgba(0, 0, 0, 0.75);">
+            <div id="DonDiv" style="clear:both; float:right;">Donation Total&nbsp;<input id="DonTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+            <div id="CostDiv" style="clear:both; float:right;">Cost Total&nbsp;<input id="CostTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+            <div id="TotalDiv" style="clear:both; float:right;">Order Total&nbsp;<input id="CartTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+            <div id="PaymentDiv" style="clear:both; float:right;">Payment(s)&nbsp;<input id="CartPayTotal" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+            <div id="BalanceDiv" style="clear:both; float:right;">Balance&nbsp;<input id="CartBalance" style="text-align:right; width:75px; background-color:RGBA(211,211,211,.4)" readonly="readonly" value="$0.00" /></div>
+            <div id="CreateDiv" style="clear:both; float:left; width:100%; text-align:center; display:none;">
+                <button style="font-size:10pt; margin-top:6px; background-color:#adc72e;" onclick="fn_CompletePurchase();">Create PO</button>
             </div>
         </div>
     </div>
+</div>
 <!--BEGIN MODAL-->
 <div class="modal loadingModal bs-example-modal-sm" id="AdvancedSearchDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
     <div class="modal-dialog modal-sm" style="border-radius:4px;">
@@ -886,7 +1049,7 @@
 
                         <div style="display:inline-block; clear:both; float:left; margin-top:10px;">
                             <label for="SearchBox2" style="margin:5px; display:inline-block; float:left;">Text</label>
-                            <input id="AdvSearchBox" class="SearchBox" placeholder="Search Exchange Events" style="padding-left:5px; box-shadow:0 1px 2px 0; border:solid grey 1px; border-radius:4px; color:black; background-color:white; width:220px;" autofocus="" onkeypress="fn_AdvSearch();">
+                            <input id="AdvSearchBox" class="SearchBox" placeholder="Search Exchange Events" style="padding-left:5px; box-shadow:0 1px 2px 0; border:solid grey 1px; border-radius:4px; color:black; background-color:white; width:220px;" autofocus="">
                         </div>
                         <div style="display:inline-block; clear:both; float:left; margin-top:10px;">
                             <label for="ParentList" style="margin:5px; display:inline-block; float:left;">Parent</label>
@@ -977,7 +1140,7 @@
 </div>
 <div class="modal loadingModal" id="CreditCardDiv" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static" style="margin-top:20px;">
     <div class="modal-dialog" style="border-radius:4px;">
-        <div class="modal-content modal-sm" style="border-radius:6px; background-color:#ecf2f9;" ">
+        <div class="modal-content modal-sm" style="border-radius:6px; background-color:#ecf2f9;">
             <div class="modal-header" style="margin:10px; height:72px; border-radius:6px; background-color:#1c81db; padding:0px;">
                 <div style="margin-left:10px; width:80%; float:left;">
                     <label style="font-size:18pt; margin-top:20px; margin-left:30px; font-weight:500; color:#ffffff; max-width:80%; float:left;">Select Credit Card</label>
